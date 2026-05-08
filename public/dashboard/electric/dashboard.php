@@ -1,0 +1,189 @@
+<?php
+session_start();
+
+require_once __DIR__ . '/../../../src/middleware/requireAuth.php';
+require_once __DIR__ . '/../../../src/config/app.php';
+
+$user = requireAuth();
+
+if ($user['role'] !== 'electric_company') {
+    header("Location: " . BASE_URL . "/dashboard/user/user.php");
+    exit;
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Electric Company Dashboard</title>
+
+<style>
+
+body {
+    font-family: Arial;
+    background: #eef2f7;
+    margin: 0;
+}
+
+nav {
+    background: #111;
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+}
+
+nav a {
+    color: white;
+    margin-right: 15px;
+    text-decoration: none;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.card h2 {
+    font-size: 36px;
+    margin: 10px 0;
+}
+
+.blue { background: #007bff; color: white; }
+.green { background: #28a745; color: white; }
+
+button {
+    padding: 10px;
+    border: none;
+    background: #007bff;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.loading {
+    opacity: 0.6;
+}
+
+</style>
+</head>
+
+<body>
+
+<nav>
+    <b>ELECTRIC COMPANY PANEL</b>
+    <div>
+        <a href="dashboard.php">Dashboard</a>
+        <a href="outages.php">Outages</a>
+        <a href="maintenance.php">Maintenance</a>
+        <a href="<?= BASE_URL ?>/logout.php">Logout</a>
+    </div>
+</nav>
+
+<h2 style="padding:20px;">
+    Welcome <?= htmlspecialchars($user['name']) ?>
+</h2>
+
+<!-- ================= ONLY 2 CARDS ================= -->
+<div class="container">
+
+    <div class="card blue loading">
+        <h2 id="active">0</h2>
+        <p>⚡ Active Outages</p>
+    </div>
+
+    <div class="card green loading">
+        <h2 id="resolved">0</h2>
+        <p>✅ Resolved Outages</p>
+    </div>
+
+</div>
+
+<!-- ================= QUICK ACTIONS ================= -->
+<h3 style="padding:20px;">Quick Actions</h3>
+
+<div style="padding:20px;">
+
+    <button onclick="location.href='outages.php'">
+        View Outages
+    </button>
+
+    <button onclick="location.href='maintenance.php'">
+        Manage Maintenance
+    </button>
+
+</div>
+
+<script>
+
+/* =========================================
+   ELECTRIC COMPANY STATS (ONLY ACTIVE + RESOLVED)
+========================================= */
+
+async function loadCompanyStats() {
+
+    try {
+        const res = await fetch(
+            "http://localhost/crowdsourcedapi/api/outage_report/get_active.php",
+            {
+                method: "GET",
+                credentials: "include",
+                headers: { "Accept": "application/json" }
+            }
+        );
+
+        const data = await res.json();
+
+        console.log("API Response:", data);
+
+        if (!data || !data.success) {
+            throw new Error("Invalid response");
+        }
+
+        // ✅ FIXED: correct field name
+        setCard("active", data.total_active_reports);
+
+        // ❌ YOU DON'T HAVE THIS YET IN THIS ENDPOINT
+        setCard("resolved", 0);
+
+    } catch (err) {
+        console.error("Dashboard error:", err);
+
+        setErrorState();
+    }
+}
+
+/* ================= UI UPDATE ================= */
+function setCard(id, value) {
+    const el = document.getElementById(id);
+    el.innerText = value ?? 0;
+    el.parentElement.classList.remove("loading");
+}
+
+/* ================= ERROR STATE ================= */
+function setErrorState() {
+    ["active", "resolved"].forEach(id => {
+        const el = document.getElementById(id);
+        el.innerText = "—";
+        el.parentElement.classList.remove("loading");
+    });
+}
+
+/* ================= INIT ================= */
+loadCompanyStats();
+setInterval(loadCompanyStats, 10000);
+
+</script>
+
+</body>
+</html>

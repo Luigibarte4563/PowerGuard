@@ -2,17 +2,32 @@
 
 require_once __DIR__ . '/../config/connection.php';
 require_once __DIR__ . '/../config/app.php';
+require_once __DIR__ . '/../config/env.php';
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-function requireAuth() {
+function requireAuth($debug = false) {
+
     $conn = getConnection();
 
-    $secret_key = "11111111111111111111111111111111";
+    // ✅ FIX: use env instead of hardcoded key
+    $secret_key = $_ENV['JWT_SECRET_KEY'] ?? null;
+
+    if (!$secret_key) {
+        http_response_code(500);
+        exit(json_encode([
+            "success" => false,
+            "message" => "JWT secret missing in .env"
+        ]));
+    }
 
     $user = null;
+    $jwtError = null;
 
+    /* =========================
+       1. JWT AUTH (PRIMARY)
+    ========================= */
     if (isset($_COOKIE['jwt_token'])) {
 
         try {
@@ -28,11 +43,15 @@ function requireAuth() {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         } catch (Exception $e) {
+            $jwtError = $e->getMessage();
             $user = null;
         }
     }
 
-    if (!$user && isset($_SESSION['user'])) {
+    /* =========================
+       2. SESSION FALLBACK
+    ========================= */
+    if (!$user && isset($_SESSION['user']['id'])) {
 
         $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$_SESSION['user']['id']]);
@@ -40,9 +59,29 @@ function requireAuth() {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    /* =========================
+       3. BLOCK IF NO USER
+    ========================= */
     if (!$user) {
 
-        header("Location: " . BASE_URL . "/auth/auth.php?page=login");
+        http_response_code(401);
+
+        $response = [
+            "success" => false,
+            "message" => "Unauthorized"
+        ];
+
+        // 🔍 DEBUG MODE
+        if ($debug) {
+            $response["debug"] = [
+                "jwt_error" => $jwtError,
+                "jwt_cookie_exists" => isset($_COOKIE['jwt_token']),
+                "session_exists" => isset($_SESSION['user'])
+            ];
+        }
+
+        header("Content-Type: application/json");
+        echo json_encode($response);
         exit;
     }
 

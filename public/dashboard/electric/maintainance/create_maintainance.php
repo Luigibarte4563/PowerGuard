@@ -24,7 +24,7 @@
             max-width: 450px;
         }
 
-        input, textarea, button {
+        input, textarea, select, button {
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 6px;
@@ -40,17 +40,13 @@
             background: #27ae60;
         }
 
-        #radiusValue {
+        select[multiple] {
+            height: 140px;
+        }
+
+        #status {
+            margin-top: 10px;
             font-weight: bold;
-        }
-
-        .row {
-            display: flex;
-            gap: 10px;
-        }
-
-        .row > div {
-            flex: 1;
         }
     </style>
 </head>
@@ -61,18 +57,44 @@
 
 <form id="maintenanceForm">
 
-    <input type="text" id="affected_area" placeholder="Affected Area (auto-filled from map)" required>
+    <input type="text" id="affected_area" placeholder="Affected Area (map preview only)" required>
+
+    <!-- ================= BARANGAY-BASED APPROACH ================= -->
+    <label>Barangays Affected (PRIMARY FILTER)</label>
+    <select id="barangays" multiple required>
+        <option value="Bonuan Gueset">Bonuan Gueset</option>
+        <option value="Bonuan Boquig">Bonuan Boquig</option>
+        <option value="Bonuan Binloc">Bonuan Binloc</option>
+
+        <option value="Lucao">Lucao</option>
+        <option value="Tapuac">Tapuac</option>
+        <option value="Tambac">Tambac</option>
+        <option value="Pantal">Pantal</option>
+
+        <option value="Bacayao Norte">Bacayao Norte</option>
+        <option value="Bacayao Sur">Bacayao Sur</option>
+
+        <option value="Malued">Malued</option>
+        <option value="Mayombo">Mayombo</option>
+
+        <option value="Mangin">Mangin</option>
+        <option value="Tebeng">Tebeng</option>
+
+        <option value="Pogo Chico">Pogo Chico</option>
+        <option value="Pogo Grande">Pogo Grande</option>
+
+        <option value="Herrero">Herrero</option>
+        <option value="Poblacion Centro">Poblacion Centro</option>
+        <option value="Poblacion Oeste">Poblacion Oeste</option>
+        <option value="Poblacion Este">Poblacion Este</option>
+    </select>
+
+    <small>Hold CTRL / tap to select multiple</small>
 
     <div class="row">
         <div>
             <label>Maintenance Date</label>
             <input type="date" id="maintenance_date" required>
-        </div>
-
-        <div>
-            <label>Radius (meters)</label>
-            <input type="range" id="radius" min="500" max="10000" value="2000">
-            <div>Radius: <span id="radiusValue">2000</span> m</div>
         </div>
     </div>
 
@@ -83,11 +105,12 @@
 
     <textarea id="description" placeholder="Description"></textarea>
 
-    <!-- hidden coords -->
+    <!-- map preview only -->
     <input type="hidden" id="latitude">
     <input type="hidden" id="longitude">
 
-    <button type="submit">Create Maintenance</button>
+    <button type="submit" id="submitBtn">Create Maintenance</button>
+
 </form>
 
 <p id="status"></p>
@@ -104,30 +127,114 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let marker;
-let circle;
+let barangayLayer = {};
 
-/* ICON */
-const icon = L.icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/252/252025.png',
-    iconSize: [35, 35],
-    iconAnchor: [17, 35]
+/* ================= BARANGAY DATA ================= */
+const barangayData = {
+    "Bonuan Gueset": { lat: 16.0585, lng: 120.3345 },
+    "Bonuan Boquig": { lat: 16.0600, lng: 120.3200 },
+    "Bonuan Binloc": { lat: 16.0620, lng: 120.3100 },
+
+    "Lucao": { lat: 16.0435, lng: 120.3310 },
+    "Tapuac": { lat: 16.0460, lng: 120.3450 },
+    "Tambac": { lat: 16.0520, lng: 120.3400 },
+    "Pantal": { lat: 16.0468, lng: 120.3330 },
+
+    "Bacayao Norte": { lat: 16.0300, lng: 120.3200 },
+    "Bacayao Sur": { lat: 16.0250, lng: 120.3250 },
+
+    "Malued": { lat: 16.0400, lng: 120.3200 },
+    "Mayombo": { lat: 16.0480, lng: 120.3100 },
+
+    "Mangin": { lat: 16.0550, lng: 120.3500 },
+    "Tebeng": { lat: 16.0600, lng: 120.3450 },
+
+    "Pogo Chico": { lat: 16.0510, lng: 120.3600 },
+    "Pogo Grande": { lat: 16.0550, lng: 120.3650 },
+
+    "Herrero": { lat: 16.0450, lng: 120.3350 },
+    "Poblacion Centro": { lat: 16.0430, lng: 120.3335 },
+    "Poblacion Oeste": { lat: 16.0410, lng: 120.3300 },
+    "Poblacion Este": { lat: 16.0440, lng: 120.3360 }
+};
+
+/* ================= CREATE CIRCLES (HIDDEN INITIALLY) ================= */
+Object.keys(barangayData).forEach(name => {
+
+    const b = barangayData[name];
+
+    const circle = L.circle([b.lat, b.lng], {
+        radius: 1200,
+        color: "#2ecc71",
+        fillColor: "#2ecc71",
+        fillOpacity: 0.0,   // hidden
+        weight: 1
+    });
+
+    circle.bindPopup(name);
+
+    barangayLayer[name] = circle;
+
+    circle.on("click", () => toggleBarangay(name));
 });
 
-/* ================= UPDATE RADIUS UI ================= */
-const radiusInput = document.getElementById("radius");
-const radiusValue = document.getElementById("radiusValue");
+/* ================= TOGGLE BARANGAY ================= */
+function toggleBarangay(name) {
 
-radiusInput.addEventListener("input", () => {
+    const select = document.getElementById("barangays");
+    const option = [...select.options].find(o => o.value === name);
 
-    radiusValue.innerText = radiusInput.value;
+    if (!option) return;
 
-    if(circle){
-        circle.setRadius(radiusInput.value);
+    option.selected = !option.selected;
+
+    syncBarangayState(name);
+}
+
+/* ================= SYNC UI STATE ================= */
+function syncBarangayState(name) {
+
+    const circle = barangayLayer[name];
+    const select = document.getElementById("barangays");
+
+    const isSelected = [...select.options]
+        .some(o => o.value === name && o.selected);
+
+    if (isSelected) {
+
+        // SHOW
+        if (!map.hasLayer(circle)) {
+            circle.addTo(map);
+        }
+
+        circle.setStyle({
+            color: "#e74c3c",
+            fillColor: "#e74c3c",
+            fillOpacity: 0.25,
+            weight: 2
+        });
+
+        map.panTo(circle.getLatLng());
+
+    } else {
+
+        // HIDE
+        if (map.hasLayer(circle)) {
+            map.removeLayer(circle);
+        }
     }
+}
+
+/* ================= DROPDOWN → MAP SYNC ================= */
+document.getElementById("barangays").addEventListener("change", function () {
+
+    Object.keys(barangayLayer).forEach(name => {
+        syncBarangayState(name);
+    });
 });
 
-/* ================= MAP CLICK ================= */
-map.on("click", async function(e){
+/* ================= MAP CLICK (MARK LOCATION ONLY) ================= */
+map.on("click", function (e) {
 
     const lat = e.latlng.lat;
     const lng = e.latlng.lng;
@@ -135,36 +242,27 @@ map.on("click", async function(e){
     document.getElementById("latitude").value = lat;
     document.getElementById("longitude").value = lng;
 
-    if(marker) map.removeLayer(marker);
-    if(circle) map.removeLayer(circle);
+    if (marker) map.removeLayer(marker);
 
-    marker = L.marker([lat, lng], { icon }).addTo(map);
-
-    circle = L.circle([lat, lng], {
-        radius: radiusInput.value
-    }).addTo(map);
-
-    map.setView([lat, lng], 15);
-
-    /* ================= GEOCODING ================= */
-    try {
-        const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-        );
-
-        const data = await res.json();
-
-        document.getElementById("affected_area").value =
-            data.display_name || `${lat}, ${lng}`;
-
-    } catch(err){
-        document.getElementById("affected_area").value = `${lat}, ${lng}`;
-    }
+    marker = L.marker([lat, lng]).addTo(map);
 });
 
 /* ================= SUBMIT ================= */
 document.getElementById("maintenanceForm").addEventListener("submit", async (e) => {
+
     e.preventDefault();
+
+    const status = document.getElementById("status");
+    const btn = document.getElementById("submitBtn");
+
+    const barangays = Array.from(
+        document.getElementById("barangays").selectedOptions
+    ).map(opt => opt.value);
+
+    if (barangays.length === 0) {
+        status.innerText = "❌ Select at least 1 barangay";
+        return;
+    }
 
     const payload = {
         affected_area: document.getElementById("affected_area").value,
@@ -172,36 +270,57 @@ document.getElementById("maintenanceForm").addEventListener("submit", async (e) 
         start_time: document.getElementById("start_time").value,
         end_time: document.getElementById("end_time").value,
         description: document.getElementById("description").value,
-        radius: document.getElementById("radius").value,
         latitude: document.getElementById("latitude").value,
-        longitude: document.getElementById("longitude").value
+        longitude: document.getElementById("longitude").value,
+        barangays: barangays
     };
 
     try {
 
-        const res = await fetch(
-            "http://localhost/crowdsourcedapi/api/maintainance/create.php",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify(payload)
-            }
-        );
+        btn.disabled = true;
+        btn.innerText = "Creating...";
 
-        const result = await res.json();
+        console.log("PAYLOAD:", payload);
 
-        document.getElementById("status").innerText = result.message;
+const res = await fetch(
+    "http://localhost/crowdsourcedapi/api/maintainance/create.php",
+    {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify(payload)
+    }
+);
 
-        if(result.success){
-            alert(
-                `Maintenance created!\nNotifications sent: ${result.notifications_sent}`
-            );
-        }
+const text = await res.text();
 
-    } catch(err){
-        console.error(err);
-        document.getElementById("status").innerText = "Error creating maintenance";
+console.log("RAW RESPONSE:", text);
+
+const result = JSON.parse(text);
+
+
+        if (!result.success) throw new Error(result.message);
+
+        status.innerText = "✅ " + result.message;
+
+        alert(`Maintenance created!\nBarangays: ${barangays.length}`);
+
+        document.getElementById("maintenanceForm").reset();
+
+        if (marker) map.removeLayer(marker);
+
+        // reset all circles
+        Object.values(barangayLayer).forEach(c => {
+            if (map.hasLayer(c)) map.removeLayer(c);
+        });
+
+    } catch (err) {
+        status.innerText = "❌ " + err.message;
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Create Maintenance";
     }
 });
 
