@@ -56,8 +56,8 @@
         .modal-content{
             background:#fff;
             padding:20px;
-            width:400px;
-            margin:10% auto;
+            width:500px;
+            margin:5% auto;
             border-radius:10px;
         }
 
@@ -65,6 +65,11 @@
             width:100%;
             margin-bottom:10px;
             padding:8px;
+        }
+
+        #editMap{
+            height:250px;
+            margin-bottom:10px;
         }
     </style>
 </head>
@@ -75,10 +80,8 @@
 
 <p id="status">Loading stations...</p>
 
-<!-- MAP -->
 <div id="map"></div>
 
-<!-- LIST -->
 <h3>Station List</h3>
 <div id="list"></div>
 
@@ -87,12 +90,11 @@
 
     <div class="modal-content">
 
-        <h3>Edit Station</h3>
+        <h3>Edit Station + Pin Location</h3>
 
         <input type="hidden" id="edit_id">
 
         <input type="text" id="edit_station_name" placeholder="Station Name">
-
         <input type="text" id="edit_location_name" placeholder="Location">
 
         <select id="edit_station_type">
@@ -111,6 +113,12 @@
 
         <textarea id="edit_description" placeholder="Description"></textarea>
 
+        <!-- 🔥 PIN LOCATION MAP -->
+        <div id="editMap"></div>
+
+        <input type="text" id="edit_lat" placeholder="Latitude" readonly>
+        <input type="text" id="edit_lng" placeholder="Longitude" readonly>
+
         <button onclick="updateStation()">Update</button>
         <button onclick="closeModal()">Cancel</button>
 
@@ -120,7 +128,7 @@
 
 <script>
 
-/* ================= MAP INIT ================= */
+/* ================= MAIN MAP ================= */
 let map = L.map('map').setView([16.0431, 120.3330], 13);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -135,6 +143,10 @@ const icon = L.icon({
 
 let layerGroup = L.layerGroup().addTo(map);
 
+/* ================= EDIT MAP ================= */
+let editMap;
+let editMarker;
+
 /* ================= OPEN EDIT MODAL ================= */
 function openEdit(s){
 
@@ -145,7 +157,43 @@ function openEdit(s){
     document.getElementById("edit_status").value = s.availability_status;
     document.getElementById("edit_description").value = s.description ?? "";
 
+    document.getElementById("edit_lat").value = s.latitude;
+    document.getElementById("edit_lng").value = s.longitude;
+
     document.getElementById("editModal").style.display = "block";
+
+    setTimeout(() => initEditMap(s.latitude, s.longitude), 200);
+}
+
+/* ================= INIT EDIT MAP ================= */
+function initEditMap(lat, lng){
+
+    if(editMap){
+        editMap.remove();
+    }
+
+    editMap = L.map('editMap').setView([lat, lng], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: "© OpenStreetMap"
+    }).addTo(editMap);
+
+    editMarker = L.marker([lat, lng], {
+        draggable: true
+    }).addTo(editMap);
+
+    editMarker.on('dragend', function(e){
+        const pos = editMarker.getLatLng();
+        document.getElementById("edit_lat").value = pos.lat;
+        document.getElementById("edit_lng").value = pos.lng;
+    });
+
+    editMap.on('click', function(e){
+        editMarker.setLatLng(e.latlng);
+
+        document.getElementById("edit_lat").value = e.latlng.lat;
+        document.getElementById("edit_lng").value = e.latlng.lng;
+    });
 }
 
 /* CLOSE MODAL */
@@ -162,7 +210,11 @@ async function updateStation(){
         location_name: document.getElementById("edit_location_name").value,
         station_type: document.getElementById("edit_station_type").value,
         availability_status: document.getElementById("edit_status").value,
-        description: document.getElementById("edit_description").value
+        description: document.getElementById("edit_description").value,
+
+        // 🔥 NEW PIN LOCATION
+        latitude: document.getElementById("edit_lat").value,
+        longitude: document.getElementById("edit_lng").value
     };
 
     try {
@@ -220,7 +272,6 @@ async function loadStations(){
             <div class="card">
 
                 <div class="title">${s.station_name}</div>
-
                 <div>${s.location_name}</div>
 
                 <small>

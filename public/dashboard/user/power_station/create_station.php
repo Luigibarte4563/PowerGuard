@@ -193,9 +193,11 @@ document.getElementById("stationForm").addEventListener("submit", async (e) => {
     const payload = {
         station_name: document.getElementById("station_name").value,
         location_name: document.getElementById("location_name").value,
+
         station_type: document.getElementById("station_type").value,
         access_type: document.getElementById("access_type").value,
         availability_status: document.getElementById("availability_status").value,
+
         operating_hours: document.getElementById("operating_hours").value,
         charging_type: document.getElementById("charging_type").value,
         description: document.getElementById("description").value
@@ -218,24 +220,8 @@ document.getElementById("stationForm").addEventListener("submit", async (e) => {
         document.getElementById("response").innerText = result.message;
 
         if(result.success){
-
+            e.target.reset();
             loadStations();
-
-            // OPTIONAL: pin new station immediately if backend returns coords
-            if(result.latitude && result.longitude){
-
-                const m = L.marker([result.latitude, result.longitude], { icon })
-                    .addTo(stationLayer)
-                    .bindPopup(`
-                        <b>${payload.station_name}</b><br>
-                        ${payload.station_type}<br>
-                        ${payload.availability_status}<br>
-                        ${payload.location_name}
-                    `)
-                    .openPopup();
-
-                map.setView([result.latitude, result.longitude], 16);
-            }
         }
 
     } catch (err) {

@@ -10,15 +10,14 @@ body{
     padding:20px;
 }
 
-/* REPORT CARDS */
 .card{
     border:1px solid #ccc;
     padding:12px;
     margin-bottom:10px;
     border-radius:8px;
+    background:#fff;
 }
 
-/* MODAL */
 #formOverlay{
     display:none;
     position:fixed;
@@ -37,14 +36,12 @@ body{
     border-radius:10px;
 }
 
-/* INPUTS */
 input, select, textarea{
     width:100%;
     padding:8px;
     margin-top:8px;
 }
 
-/* BUTTONS */
 button{
     width:100%;
     padding:10px;
@@ -58,313 +55,157 @@ button{
 
 <h2>My Outage Reports</h2>
 
-
-<!-- =========================================
-     REPORT LIST
-========================================= -->
 <div id="list"></div>
 
-<!-- =========================================
-     EDIT MODAL
-========================================= -->
+<!-- MODAL -->
 <div id="formOverlay">
+<div id="formBox">
 
-    <div id="formBox">
+<h3>Edit Report</h3>
 
-        <h3>Edit Report</h3>
+<input type="hidden" id="id">
 
-        <!-- REQUIRED FIELDS -->
-        <input type="hidden" id="id">
+<input type="text" id="location_name" placeholder="Location Name">
 
-        <input type="text" id="location_name" placeholder="Location Name">
+<select id="category">
+    <option value="power_outage">Power Outage</option>
+    <option value="low_voltage">Low Voltage</option>
+    <option value="power_fluctuation">Power Fluctuation</option>
+    <option value="transformer_explosion">Transformer Explosion</option>
+    <option value="fallen_power_line">Fallen Power Line</option>
+    <option value="electrical_fire">Electrical Fire</option>
+    <option value="scheduled_maintenance">Maintenance</option>
+    <option value="unknown_issue">Unknown</option>
+</select>
 
-        <select id="category">
-            <option value="power_outage">Power Outage</option>
-            <option value="low_voltage">Low Voltage</option>
-            <option value="power_fluctuation">Power Fluctuation</option>
-            <option value="transformer_explosion">Transformer Explosion</option>
-            <option value="fallen_power_line">Fallen Power Line</option>
-            <option value="electrical_fire">Electrical Fire</option>
-            <option value="scheduled_maintenance">Maintenance</option>
-            <option value="unknown_issue">Unknown</option>
-        </select>
+<select id="severity">
+    <option value="minor">Minor</option>
+    <option value="moderate">Moderate</option>
+    <option value="critical">Critical</option>
+</select>
 
-        <select id="severity">
-            <option value="minor">Minor</option>
-            <option value="moderate">Moderate</option>
-            <option value="critical">Critical</option>
-        </select>
+<textarea id="description" placeholder="Description"></textarea>
 
-        <textarea id="description" placeholder="Description"></textarea>
+<input type="number" id="affected_houses">
 
-        <input type="number" id="affected_houses" placeholder="Affected Houses">
+<select id="status">
+    <option value="active">Active</option>
+    <option value="under_review">Under Review</option>
+    <option value="verified">Verified</option>
+    <option value="resolved">Resolved</option>
+    <option value="rejected">Rejected</option>
+</select>
 
-        <select id="status">
-            <option value="unverified">Unverified</option>
-            <option value="under_review">Under Review</option>
-            <option value="verified">Verified</option>
-            <option value="resolved">Resolved</option>
-            <option value="fake_report">Fake Report</option>
-        </select>
+<select id="is_active">
+    <option value="1">Active</option>
+    <option value="0">Inactive</option>
+</select>
 
-        <select id="is_active">
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
-            <option value="unknown">Unknown</option>
-        </select>
+<select id="hazard_type">
+    <option value="none">None</option>
+    <option value="smoke">Smoke</option>
+    <option value="sparks">Sparks</option>
+    <option value="fire">Fire</option>
+    <option value="fallen_wire">Fallen Wire</option>
+    <option value="explosion_sound">Explosion Sound</option>
+</select>
 
-        <select id="hazard_type">
-            <option value="none">None</option>
-            <option value="smoke">Smoke</option>
-            <option value="sparks">Sparks</option>
-            <option value="fire">Fire</option>
-            <option value="fallen_wire">Fallen Wire</option>
-            <option value="explosion_sound">Explosion Sound</option>
-        </select>
-
-        <!-- GPS -->
-        <input type="hidden" id="latitude">
-        <input type="hidden" id="longitude">
-
-        <!-- ACTION BUTTONS -->
-        <button type="button" onclick="useCurrentLocation()">
-            Use Current Location
-        </button>
-
-        <button type="button" onclick="updateReport()">
-            Update Report
-        </button>
-
-        <button type="button" onclick="closeForm()">
-            Close
-        </button>
-
-    </div>
+<button onclick="updateReport()">Update Report</button>
+<button onclick="closeForm()">Close</button>
 
 </div>
+</div>
 
-</body>
-</html>
 <script>
 
-/* =========================================
-   TRACK ORIGINAL LOCATION
-========================================= */
+let currentReport = null;
 
-let originalLocation = "";
-let locationChanged = false;
-
-/* =========================================
-   LOAD REPORTS (FAST RENDER)
-========================================= */
-
+/* ================= LOAD ================= */
 async function loadReports(){
 
     const list = document.getElementById("list");
-    list.innerHTML = "<p>Loading...</p>";
+    list.innerHTML = "Loading...";
 
     try {
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
 
         const res = await fetch(
             "http://localhost/crowdsourcedapi/api/outage_report/get_my_report.php",
             {
                 method: "GET",
-                credentials: "include",
-                signal: controller.signal
+                credentials: "include" // JWT COOKIE
             }
         );
-
-        clearTimeout(timeout);
 
         const result = await res.json();
 
         if(!result.success){
-            list.innerHTML = "<p>Failed to load reports</p>";
+            list.innerHTML = "Failed to load";
             return;
         }
 
         if(!result.data.length){
-            list.innerHTML = "<p>No reports found</p>";
+            list.innerHTML = "No reports found";
             return;
         }
 
-        /* FAST DOM RENDER */
-        list.innerHTML = result.data.map(r => {
+        list.innerHTML = result.data.map(r => `
+            <div class="card">
+                <h3>${r.location_name}</h3>
+                <p>${r.description || ""}</p>
+                <small>
+                    ${r.category} | ${r.severity} | ${r.status}
+                </small>
+                <br><br>
 
-            const safeData = JSON.stringify(r)
-                .replace(/"/g, "&quot;");
+                <!-- SAFE: store JSON in data attribute -->
+                <button onclick='editReport(this)'
+                    data-report='${JSON.stringify(r).replace(/'/g, "&apos;")}'
+                >
+                    Edit
+                </button>
+            </div>
+        `).join("");
 
-            return `
-                <div class="card">
-                    <h3>${r.location_name}</h3>
-                    <p>${r.description}</p>
-                    <small>
-                        ${r.category} | ${r.severity} | ${r.status}
-                    </small>
-                    <br>
-                    <button onclick='editReport(${safeData})'>
-                        Edit
-                    </button>
-                </div>
-            `;
-
-        }).join("");
-
-    } catch(error){
-
-        console.error(error);
-
-        list.innerHTML = error.name === "AbortError"
-            ? "<p>Request timed out</p>"
-            : "<p>Server error</p>";
+    } catch(err){
+        console.error(err);
+        list.innerHTML = "Server error";
     }
 }
 
 
-/* =========================================
-   OPEN EDIT FORM (SAFE BINDING)
-========================================= */
+/* ================= EDIT ================= */
+function editReport(btn){
 
-function editReport(r){
+    const r = JSON.parse(btn.getAttribute("data-report"));
 
-    const set = (id, value) => {
-        const el = document.getElementById(id);
-        if(el) el.value = value ?? "";
-    };
+    currentReport = r;
 
-    set("id", r.id);
-    set("location_name", r.location_name);
-    set("category", r.category);
-    set("severity", r.severity);
-    set("description", r.description);
-    set("affected_houses", r.affected_houses);
-    set("status", r.status);
-    set("is_active", r.is_active || "unknown");
-    set("hazard_type", r.hazard_type || "none");
-    set("latitude", r.latitude);
-    set("longitude", r.longitude);
-
-    originalLocation = r.location_name || "";
-    locationChanged = false;
+    document.getElementById("id").value = r.id;
+    document.getElementById("location_name").value = r.location_name || "";
+    document.getElementById("category").value = r.category;
+    document.getElementById("severity").value = r.severity;
+    document.getElementById("description").value = r.description || "";
+    document.getElementById("affected_houses").value = r.affected_houses || 1;
+    document.getElementById("status").value = r.status;
+    document.getElementById("is_active").value = r.is_active ? "1" : "0";
+    document.getElementById("hazard_type").value = r.hazard_type || "none";
 
     document.getElementById("formOverlay").style.display = "block";
 }
 
 
-/* =========================================
-   LOCATION CHANGE DETECTION (FIXED)
-========================================= */
-
-document.addEventListener("DOMContentLoaded", () => {
-
-    const input = document.getElementById("location_name");
-
-    if(input){
-
-        input.addEventListener("input", () => {
-
-            locationChanged =
-                input.value.trim() !== originalLocation;
-        });
-    }
-});
-
-
-/* =========================================
-   FAST GEOLOCATION (NON-BLOCKING UX)
-========================================= */
-
-async function useCurrentLocation(){
-
-    navigator.geolocation.getCurrentPosition(
-
-        async (pos) => {
-
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-
-            document.getElementById("latitude").value = lat;
-            document.getElementById("longitude").value = lng;
-
-            locationChanged = true;
-
-            const field = document.getElementById("location_name");
-
-            /* SHOW COORDS INSTANTLY */
-            field.value = `${lat}, ${lng}`;
-
-            /* SKIP if user already manually edited AFTER original */
-            if(field.value.trim() !== "" && field.value !== originalLocation){
-                return;
-            }
-
-            /* BACKGROUND GEOCODING (NON-BLOCKING) */
-            try {
-
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 3000);
-
-                const res = await fetch(
-                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`,
-                    {
-                        signal: controller.signal,
-                        headers: { "Accept-Language": "en" }
-                    }
-                );
-
-                clearTimeout(timeout);
-
-                const data = await res.json();
-                const a = data.address || {};
-
-                const shortLocation = [
-                    a.road,
-                    a.suburb,
-                    a.city || a.town || a.village,
-                    a.state
-                ].filter(Boolean).join(", ");
-
-                field.value = shortLocation || data.display_name || `${lat}, ${lng}`;
-
-            } catch(error){
-                console.error(error);
-            }
-        },
-
-        (error) => {
-            console.error(error);
-            alert("Failed to get location");
-        },
-
-        {
-            enableHighAccuracy: false,
-            timeout: 5000,
-            maximumAge: 60000
-        }
-    );
-}
-
-
-/* =========================================
-   CLOSE MODAL
-========================================= */
-
+/* ================= CLOSE ================= */
 function closeForm(){
     document.getElementById("formOverlay").style.display = "none";
 }
 
 
-/* =========================================
-   UPDATE REPORT (OPTIMIZED PAYLOAD)
-========================================= */
-
+/* ================= UPDATE (JWT READY) ================= */
 async function updateReport(){
 
     const payload = {
         id: document.getElementById("id").value,
+        location_name: document.getElementById("location_name").value,
         category: document.getElementById("category").value,
         severity: document.getElementById("severity").value,
         description: document.getElementById("description").value,
@@ -374,32 +215,19 @@ async function updateReport(){
         hazard_type: document.getElementById("hazard_type").value
     };
 
-    /* SEND LOCATION ONLY IF CHANGED */
-    if(locationChanged){
-        payload.location_name = document.getElementById("location_name").value;
-        payload.latitude = document.getElementById("latitude").value || null;
-        payload.longitude = document.getElementById("longitude").value || null;
-    }
-
     try {
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
 
         const res = await fetch(
             "http://localhost/crowdsourcedapi/api/outage_report/update.php",
             {
                 method: "POST",
-                credentials: "include",
-                signal: controller.signal,
+                credentials: "include", // JWT COOKIE SENT HERE
                 headers: {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify(payload)
             }
         );
-
-        clearTimeout(timeout);
 
         const result = await res.json();
 
@@ -410,22 +238,16 @@ async function updateReport(){
             loadReports();
         }
 
-    } catch(error){
-
-        console.error(error);
-
-        alert(error.name === "AbortError"
-            ? "Request timed out"
-            : "Update failed"
-        );
+    } catch(err){
+        console.error(err);
+        alert("Update failed");
     }
 }
 
-
-/* =========================================
-   INIT
-========================================= */
-
+/* INIT */
 loadReports();
 
 </script>
+
+</body>
+</html>

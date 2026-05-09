@@ -8,14 +8,30 @@
 body{
     font-family: Arial;
     padding:20px;
+    background:#f5f6fa;
 }
 
 .card{
-    border:1px solid #ccc;
-    padding:12px;
-    margin-bottom:10px;
-    border-radius:8px;
+    border:1px solid #ddd;
+    padding:15px;
+    margin-bottom:12px;
+    border-radius:10px;
+    background:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,0.05);
 }
+
+.status{
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:5px;
+    font-size:12px;
+    color:#fff;
+}
+
+.active{ background:#f39c12; }
+.under_review{ background:#3498db; }
+.resolved{ background:#2ecc71; }
+.rejected{ background:#e74c3c; }
 
 button{
     width:100%;
@@ -26,10 +42,16 @@ button{
     color:#fff;
     border:none;
     border-radius:5px;
+    font-weight:bold;
 }
 
 button:hover{
     background:#c0392b;
+}
+
+button:disabled{
+    background:#aaa;
+    cursor:not-allowed;
 }
 </style>
 </head>
@@ -48,7 +70,7 @@ button:hover{
 async function loadReports(){
 
     const list = document.getElementById("list");
-    list.innerHTML = "<p>Loading...</p>";
+    list.innerHTML = "<p>Loading reports...</p>";
 
     try {
 
@@ -67,27 +89,41 @@ async function loadReports(){
             return;
         }
 
-        if(!result.data.length){
+        if(!result.data || result.data.length === 0){
             list.innerHTML = "<p>No reports found</p>";
             return;
         }
 
-        list.innerHTML = result.data.map(r => `
-            <div class="card">
+        list.innerHTML = result.data.map(r => {
 
-                <h3>${r.location_name}</h3>
-                <p>${r.description}</p>
+            const canDelete = r.status === "active" || r.status === "under_review";
 
-                <small>
-                    ${r.category} | ${r.severity} | ${r.status}
-                </small>
+            return `
+                <div class="card">
 
-                <button onclick="deleteReport(${r.id})">
-                    Delete Report
-                </button>
+                    <h3>${r.location_name}</h3>
+                    <p>${r.description ?? "No description"}</p>
 
-            </div>
-        `).join("");
+                    <p>
+                        <span class="status ${r.status}">
+                            ${r.status.toUpperCase()}
+                        </span>
+                    </p>
+
+                    <small>
+                        Category: ${r.category} | Severity: ${r.severity}
+                    </small>
+
+                    <button 
+                        onclick="deleteReport(${r.id})"
+                        ${!canDelete ? "disabled" : ""}
+                    >
+                        ${canDelete ? "Cancel Report" : "Locked (Handled)"}
+                    </button>
+
+                </div>
+            `;
+        }).join("");
 
     } catch(err){
         console.error(err);
@@ -97,33 +133,31 @@ async function loadReports(){
 
 
 /* =========================================
-   DELETE REPORT (CALL PHP CURL BACKEND)
+   CANCEL REPORT (SOFT DELETE)
 ========================================= */
 async function deleteReport(id){
 
-    if(!confirm("Are you sure you want to delete this report?")){
+    if(!confirm("Cancel this report?")){
         return;
     }
 
     try {
 
         const res = await fetch(
-    "http://localhost/crowdsourcedapi/api/outage_report/delete.php",
-    {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ id: id })
-    }
-);
+            "http://localhost/crowdsourcedapi/api/outage_report/delete.php",
+            {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ id })
+            }
+        );
 
         const result = await res.json();
 
-        console.log(result);
-
-        alert(result.message ?? "No response message");
+        alert(result.message || "No response");
 
         if(result.success){
             loadReports();
@@ -131,7 +165,7 @@ async function deleteReport(id){
 
     } catch(err){
         console.error(err);
-        alert("Delete failed");
+        alert("Failed to cancel report");
     }
 }
 

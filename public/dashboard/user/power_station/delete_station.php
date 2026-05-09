@@ -41,6 +41,11 @@
             color:white;
             border:none;
         }
+
+        .empty{
+            padding:10px;
+            color:#777;
+        }
     </style>
 </head>
 
@@ -75,6 +80,8 @@ let layerGroup = L.layerGroup().addTo(map);
 /* ================= LOAD STATIONS ================= */
 async function loadStations(){
 
+    document.getElementById("status").innerText = "Loading...";
+
     try {
 
         const res = await fetch(
@@ -92,13 +99,21 @@ async function loadStations(){
         const stations = result.data || [];
 
         document.getElementById("status").innerText =
-            `Total Stations: ${result.count}`;
+            `Total Stations: ${stations.length}`;
 
         /* CLEAR MAP */
         layerGroup.clearLayers();
 
+        /* EMPTY STATE */
+        if(stations.length === 0){
+            document.getElementById("list").innerHTML =
+                `<div class="empty">No stations found</div>`;
+            return;
+        }
+
         /* LIST UI */
         document.getElementById("list").innerHTML = stations.map(s => `
+
             <div class="card">
 
                 <div class="title">${s.station_name}</div>
@@ -110,13 +125,14 @@ async function loadStations(){
                     Status: ${s.availability_status}
                 </small>
 
-                <p>${s.description ?? ""}</p>
+                <p>${s.description || ""}</p>
 
                 <button class="delete-btn" onclick="deleteStation(${s.id})">
                     Delete
                 </button>
 
             </div>
+
         `).join("");
 
         /* MAP MARKERS */
@@ -127,20 +143,19 @@ async function loadStations(){
             const lat = parseFloat(s.latitude);
             const lng = parseFloat(s.longitude);
 
-            if(!isNaN(lat) && !isNaN(lng)){
+            if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-                const marker = L.marker([lat, lng], { icon });
+            const marker = L.marker([lat, lng], { icon });
 
-                marker.bindPopup(`
-                    <b>${s.station_name}</b><br>
-                    ${s.station_type}<br>
-                    ${s.availability_status}<br>
-                    ${s.location_name}
-                `);
+            marker.bindPopup(`
+                <b>${s.station_name}</b><br>
+                ${s.station_type}<br>
+                ${s.availability_status}<br>
+                ${s.location_name}
+            `);
 
-                layerGroup.addLayer(marker);
-                bounds.push([lat, lng]);
-            }
+            layerGroup.addLayer(marker);
+            bounds.push([lat, lng]);
         });
 
         if(bounds.length > 0){
@@ -156,7 +171,7 @@ async function loadStations(){
 /* ================= DELETE STATION ================= */
 async function deleteStation(id){
 
-    if(!confirm("Delete this station?")) return;
+    if(!id || !confirm("Delete this station?")) return;
 
     try {
 
@@ -177,7 +192,7 @@ async function deleteStation(id){
         alert(result.message);
 
         if(result.success){
-            loadStations(); // refresh UI
+            loadStations();
         }
 
     } catch(err){

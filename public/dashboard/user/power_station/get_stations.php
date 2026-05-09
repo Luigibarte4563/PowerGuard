@@ -43,10 +43,8 @@
 
 <p id="status">Loading stations...</p>
 
-<!-- MAP -->
 <div id="map"></div>
 
-<!-- LIST -->
 <h3>Station List</h3>
 <div id="list"></div>
 
@@ -59,13 +57,48 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: "© OpenStreetMap"
 }).addTo(map);
 
-const icon = L.icon({
+/* ICONS */
+const stationIcon = L.icon({
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/252/252025.png',
     iconSize: [35, 35],
     iconAnchor: [17, 35]
 });
 
-let layerGroup = L.layerGroup().addTo(map);
+const userIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
+    iconSize: [35, 35],
+    iconAnchor: [17, 35]
+});
+
+/* LAYERS */
+let stationLayer = L.layerGroup().addTo(map);
+let userMarker = null;
+
+/* ================= USER LOCATION (PIN) ================= */
+function loadUserLocation(){
+
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+
+            if(userMarker) map.removeLayer(userMarker);
+
+            userMarker = L.marker([lat, lng], { icon: userIcon })
+                .addTo(map)
+                .bindPopup("📍 Your Location")
+                .openPopup();
+
+            map.setView([lat, lng], 14);
+        },
+        (err) => {
+            console.log("Geolocation denied or failed:", err.message);
+        }
+    );
+}
 
 /* ================= LOAD STATIONS ================= */
 async function loadStations(){
@@ -91,15 +124,13 @@ async function loadStations(){
         document.getElementById("status").innerText =
             `Total Stations: ${result.count}`;
 
-        /* CLEAR OLD LAYERS */
-        layerGroup.clearLayers();
+        /* CLEAR OLD DATA */
+        stationLayer.clearLayers();
 
-        /* LIST HTML */
+        /* LIST */
         document.getElementById("list").innerHTML = stations.map(s => `
             <div class="card">
-
                 <div class="title">${s.station_name}</div>
-
                 <div>${s.location_name}</div>
 
                 <small>
@@ -109,7 +140,6 @@ async function loadStations(){
                 </small>
 
                 <p>${s.description ?? ""}</p>
-
             </div>
         `).join("");
 
@@ -121,25 +151,22 @@ async function loadStations(){
             const lat = parseFloat(s.latitude);
             const lng = parseFloat(s.longitude);
 
-            // FIX: allow 0 values too
             if(!isNaN(lat) && !isNaN(lng)){
 
-                const marker = L.marker([lat, lng], { icon });
+                const marker = L.marker([lat, lng], { icon: stationIcon });
 
                 marker.bindPopup(`
                     <b>${s.station_name}</b><br>
-                    <b>Type:</b> ${s.station_type}<br>
-                    <b>Status:</b> ${s.availability_status}<br>
-                    <b>Location:</b> ${s.location_name}
+                    Type: ${s.station_type}<br>
+                    Status: ${s.availability_status}<br>
+                    Location: ${s.location_name}
                 `);
 
-                layerGroup.addLayer(marker);
-
+                stationLayer.addLayer(marker);
                 bounds.push([lat, lng]);
             }
         });
 
-        /* AUTO ZOOM TO ALL STATIONS */
         if(bounds.length > 0){
             map.fitBounds(bounds, { padding: [50, 50] });
         }
@@ -150,7 +177,8 @@ async function loadStations(){
     }
 }
 
-/* ================= INITIAL LOAD ================= */
+/* ================= INIT ================= */
+loadUserLocation();
 loadStations();
 
 /* AUTO REFRESH */

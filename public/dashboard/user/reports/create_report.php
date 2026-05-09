@@ -5,6 +5,36 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        form {
+            max-width: 400px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+
+        input, select, textarea, button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px;
+        }
+
+        #map {
+            height: 400px;
+            margin-top: 20px;
+        }
+
+        #response {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 
 <body>
@@ -15,9 +45,9 @@ require_once __DIR__ . '/../../../../src/middleware/requireAuth.php';
 $user = requireAuth();
 ?>
 
-
 <h2>Welcome, <?= htmlspecialchars($user['name']) ?></h2>
 
+<!-- FORM -->
 <form id="outageForm">
 
     <input type="text" id="location_name" placeholder="Location Name" required>
@@ -52,6 +82,7 @@ $user = requireAuth();
 
     <textarea id="description" placeholder="Description" required></textarea>
 
+    <!-- hidden coords -->
     <input type="hidden" id="latitude">
     <input type="hidden" id="longitude">
 
@@ -62,86 +93,68 @@ $user = requireAuth();
 
 <p id="response"></p>
 
-<div id="map" style="height:400px;"></div>
+<div id="map"></div>
 
 <script>
 
-/* ==============================
+/* =========================
    MAP INIT
-============================== */
-let map = L.map('map').setView([16.0431, 120.3330], 13);
+========================= */
+const map = L.map('map').setView([16.0431, 120.3330], 13);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(map);
 
-/* FIX: icon must exist BEFORE using markers */
-const outageIcon = L.icon({
+const icon = L.icon({
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/355/355980.png',
     iconSize: [35, 35],
     iconAnchor: [17, 35]
 });
 
-/* FIX: layer group must be declared early */
-let reportLayer = L.layerGroup().addTo(map);
 let marker;
+let layerGroup = L.layerGroup().addTo(map);
 
-/* ==============================
-   GEOLOCATION
-============================== */
-function useCurrentLocation(){
+/* =========================
+   GET LOCATION
+========================= */
+function useCurrentLocation() {
     navigator.geolocation.getCurrentPosition(async (pos) => {
 
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
 
-        document.getElementById("latitude").value = lat;
-        document.getElementById("longitude").value = lng;
+        setLocation(lat, lng, "My Location");
 
-        if(marker) map.removeLayer(marker);
-
-        marker = L.marker([lat, lng], { icon: outageIcon })
-            .addTo(map)
-            .bindPopup("Your Location")
-            .openPopup();
-
-        map.setView([lat, lng], 16);
-
-        try {
-            const res = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-            );
-
-            const data = await res.json();
-            document.getElementById("location_name").value = data.display_name;
-
-        } catch (e) {
-            console.error("Geocoding failed", e);
-        }
-
+    }, () => {
+        alert("Location access denied");
     });
 }
 
-/* ==============================
-   PIN LOCATION ON MAP CLICK
-============================== */
-map.on('click', async function(e){
+/* =========================
+   MAP CLICK
+========================= */
+map.on('click', async (e) => {
+    setLocation(e.latlng.lat, e.latlng.lng, "Pinned Location");
+});
 
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
+/* =========================
+   SET LOCATION (COMMON)
+========================= */
+async function setLocation(lat, lng, label) {
 
-    // Store coordinates
     document.getElementById("latitude").value = lat;
     document.getElementById("longitude").value = lng;
 
-    // Remove old marker
-    if(marker) map.removeLayer(marker);
+    if (marker) map.removeLayer(marker);
 
-    // Add new marker
-    marker = L.marker([lat, lng], { icon: outageIcon })
+    marker = L.marker([lat, lng], { icon })
         .addTo(map)
-        .bindPopup("Pinned Location")
+        .bindPopup(label)
         .openPopup();
 
-    // Reverse geocoding (get location name)
+    map.setView([lat, lng], 16);
+
     try {
         const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
@@ -153,17 +166,13 @@ map.on('click', async function(e){
             data.display_name || `${lat}, ${lng}`;
 
     } catch (err) {
-        console.error("Reverse geocoding failed", err);
-
-        // fallback if API fails
         document.getElementById("location_name").value = `${lat}, ${lng}`;
     }
+}
 
-});
-
-/* ==============================
-   CREATE REPORT
-============================== */
+/* =========================
+   SUBMIT REPORT
+========================= */
 document.getElementById("outageForm").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -172,11 +181,12 @@ document.getElementById("outageForm").addEventListener("submit", async (e) => {
         category: document.getElementById("category").value,
         severity: document.getElementById("severity").value,
         description: document.getElementById("description").value,
-        affected_houses: document.getElementById("affected_houses").value,
+        affected_houses: parseInt(document.getElementById("affected_houses").value),
         hazard_type: document.getElementById("hazard_type").value,
         started_at: null,
         image_proof: null,
-        user_id: <?= $user['id'] ?> // IMPORTANT FIX
+        latitude: document.getElementById("latitude").value || null,
+        longitude: document.getElementById("longitude").value || null
     };
 
     try {
@@ -184,7 +194,6 @@ document.getElementById("outageForm").addEventListener("submit", async (e) => {
             "http://localhost/crowdsourcedapi/api/outage_report/create.php",
             {
                 method: "POST",
-                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -196,85 +205,58 @@ document.getElementById("outageForm").addEventListener("submit", async (e) => {
 
         document.getElementById("response").innerText = result.message;
 
-        if(result.success){
+        if (result.success) {
+            document.getElementById("outageForm").reset();
+            if (marker) map.removeLayer(marker);
             loadReports();
         }
 
     } catch (err) {
         console.error(err);
-        document.getElementById("response").innerText = "Failed to submit report";
+        document.getElementById("response").innerText = "Submission failed";
     }
 });
 
-/* ==============================
-   LOAD MAP REPORTS (FIXED)
-============================== */
-async function loadReports(){
+/* =========================
+   LOAD REPORTS
+========================= */
+async function loadReports() {
 
-    try{
-
-        const response = await fetch(
+    try {
+        const res = await fetch(
             "http://localhost/crowdsourcedapi/api/outage_report/get.php"
         );
 
-        const result = await response.json();
+        const result = await res.json();
 
-        if(!result.success){
-            console.error("API Error:", result);
-            return;
-        }
+        if (!result.success) return;
 
-        reportLayer.clearLayers();
+        layerGroup.clearLayers();
 
         result.data.forEach(report => {
 
-            if(report.latitude && report.longitude){
+            if (!report.latitude || !report.longitude) return;
 
-                const m = L.marker(
-                    [report.latitude, report.longitude],
-                    { icon: outageIcon }
-                );
+            const m = L.marker([report.latitude, report.longitude], { icon });
 
-                m.bindPopup(`
-                    <div style="width:250px;">
+            m.bindPopup(`
+                <b>${report.location_name}</b><br><br>
 
-                        <h3>${report.location_name}</h3>
+                <b>Category:</b> ${report.category}<br>
+                <b>Severity:</b> ${report.severity}<br>
+                <b>Status:</b> ${report.status}<br>
+                <b>Affected:</b> ${report.affected_houses}<br>
+                <b>Hazard:</b> ${report.hazard_type}<br><br>
 
-                        <hr>
+                <b>Description:</b><br>
+                ${report.description}
+            `);
 
-                        <b>Category:</b> ${report.category}<br>
-                        <b>Severity:</b> ${report.severity}<br>
-                        <b>Status:</b> ${report.status}<br>
-                        <b>Affected Houses:</b> ${report.affected_houses}<br>
-                        <b>Active:</b> ${report.is_active}<br>
-                        <b>Hazard:</b> ${report.hazard_type}<br>
-                        <b>Started:</b> ${report.started_at ?? "Unknown"}<br>
-
-                        <hr>
-
-                        <b>Description:</b><br>
-                        ${report.description}
-
-                    </div>
-                `);
-
-                m.bindTooltip(
-                    `<b>${report.location_name}</b><br>${report.description}`,
-                    {
-                        direction: "top",
-                        offset: [0, -20],
-                        opacity: 0.9,
-                        sticky: true
-                    }
-                );
-
-                reportLayer.addLayer(m);
-            }
-
+            layerGroup.addLayer(m);
         });
 
-    } catch(error){
-        console.error("Load reports error:", error);
+    } catch (err) {
+        console.error("Load error:", err);
     }
 }
 

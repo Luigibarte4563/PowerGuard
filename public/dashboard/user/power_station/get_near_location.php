@@ -82,16 +82,25 @@ const userIcon = L.icon({
     iconAnchor: [17, 35]
 });
 
+const pinIcon = L.icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+    iconSize: [35, 35],
+    iconAnchor: [17, 35]
+});
+
 /* LAYERS */
 let stationLayer = L.layerGroup().addTo(map);
 let userMarker = null;
+let pinMarker = null;
 let routingControl = null;
 
-/* USER LOCATION */
+/* USER + PIN LOCATION */
 let userLat = null;
 let userLng = null;
+let pinLat = null;
+let pinLng = null;
 
-/* ================= DISTANCE (KM) ================= */
+/* ================= DISTANCE ================= */
 function getDistance(lat1, lon1, lat2, lon2) {
 
     const R = 6371;
@@ -153,16 +162,45 @@ async function loadUserLocation(){
     map.setView([userLat, userLng], 14);
 }
 
-/* ================= ROUTE + KM ================= */
+/* ================= PIN LOCATION ================= */
+map.on("click", function(e){
+
+    pinLat = e.latlng.lat;
+    pinLng = e.latlng.lng;
+
+    if(pinMarker) map.removeLayer(pinMarker);
+
+    pinMarker = L.marker([pinLat, pinLng], {
+        icon: pinIcon,
+        draggable: true
+    })
+    .addTo(map)
+    .bindPopup("📌 Selected Destination")
+    .openPopup();
+
+    pinMarker.on("dragend", function(ev){
+        pinLat = ev.target.getLatLng().lat;
+        pinLng = ev.target.getLatLng().lng;
+    });
+
+    document.getElementById("nearAlert").innerText =
+        `📌 Pin selected: ${pinLat.toFixed(5)}, ${pinLng.toFixed(5)}`;
+});
+
+/* ================= ROUTE ================= */
 function drawRoute(destLat, destLng, name){
 
-    if(!userLat || !userLng) return;
+    const startLat = userLat;
+    const startLng = userLng;
 
-    const km = getDistance(userLat, userLng, destLat, destLng);
+    const endLat = destLat;
+    const endLng = destLng;
+
+    const km = getDistance(startLat, startLng, endLat, endLng);
 
     document.getElementById("nearAlert").innerText =
         km < 1
-        ? `🚨 You are VERY near ${name} (${km.toFixed(2)} km)`
+        ? `🚨 VERY NEAR ${name} (${km.toFixed(2)} km)`
         : `Distance to ${name}: ${km.toFixed(2)} km`;
 
     if(routingControl){
@@ -171,12 +209,10 @@ function drawRoute(destLat, destLng, name){
 
     routingControl = L.Routing.control({
         waypoints: [
-            L.latLng(userLat, userLng),
-            L.latLng(destLat, destLng)
+            L.latLng(startLat, startLng),
+            L.latLng(endLat, endLng)
         ],
-        lineOptions: {
-            styles: [{ color: 'blue', weight: 5 }]
-        },
+        lineOptions: { styles: [{ color: 'blue', weight: 5 }] },
         addWaypoints: false,
         draggableWaypoints: false,
         routeWhileDragging: false,
@@ -226,8 +262,7 @@ async function loadStations(){
             <small>
                 Type: ${s.station_type}<br>
                 Status: ${s.availability_status}<br>
-                Distance: ${km.toFixed(2)} km<br>
-                👉 Click for navigation
+                Distance: ${km.toFixed(2)} km
             </small>
 
         </div>`;
