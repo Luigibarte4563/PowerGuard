@@ -1,325 +1,576 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Maintenance Scheduler</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<title>Maintenance Scheduler</title>
 
-    <style>
-        body {
-            font-family: Arial;
-            padding: 20px;
-        }
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-        #map {
-            height: 450px;
-            margin-top: 10px;
-            border-radius: 10px;
-        }
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-        form {
-            display: grid;
-            gap: 10px;
-            max-width: 450px;
-        }
+<style>
 
-        input, textarea, select, button {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-        }
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
 
-        button {
-            background: #2ecc71;
-            color: white;
-            cursor: pointer;
-        }
+body{
+    font-family:Arial, sans-serif;
+    background:#f4f6f9;
+    padding:20px;
+}
 
-        button:hover {
-            background: #27ae60;
-        }
+.container{
+    max-width:1200px;
+    margin:auto;
 
-        select[multiple] {
-            height: 140px;
-        }
+    display:grid;
+    grid-template-columns:400px 1fr;
+    gap:20px;
+}
 
-        #status {
-            margin-top: 10px;
-            font-weight: bold;
-        }
-    </style>
+.card{
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.08);
+}
+
+h2{
+    margin-bottom:15px;
+    color:#2c3e50;
+}
+
+form{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+label{
+    font-size:14px;
+    font-weight:bold;
+    color:#555;
+}
+
+input,
+textarea,
+select{
+    width:100%;
+    padding:12px;
+    border:1px solid #ccc;
+    border-radius:8px;
+    outline:none;
+}
+
+textarea{
+    resize:none;
+}
+
+select[multiple]{
+    height:180px;
+}
+
+.row{
+    display:flex;
+    gap:10px;
+}
+
+.row > div{
+    flex:1;
+}
+
+button{
+    padding:12px;
+    border:none;
+    border-radius:8px;
+    background:#27ae60;
+    color:white;
+    font-size:15px;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+button:hover{
+    background:#219150;
+}
+
+button:disabled{
+    opacity:0.6;
+    cursor:not-allowed;
+}
+
+#map{
+    width:100%;
+    height:700px;
+    border-radius:12px;
+}
+
+#status{
+    margin-top:10px;
+    font-weight:bold;
+}
+
+.success{
+    color:#27ae60;
+}
+
+.error{
+    color:#e74c3c;
+}
+
+.badge{
+    display:inline-block;
+    background:#3498db;
+    color:white;
+    padding:5px 10px;
+    border-radius:20px;
+    font-size:12px;
+}
+
+.checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.checkbox-row input{
+    width:auto;
+}
+
+.info-box{
+    background:#ecf0f1;
+    padding:10px;
+    border-radius:8px;
+    font-size:13px;
+    color:#555;
+}
+
+@media(max-width:900px){
+
+    .container{
+        grid-template-columns:1fr;
+    }
+
+    #map{
+        height:450px;
+    }
+}
+
+</style>
 </head>
 
 <body>
 
-<h2>⚡ Create Maintenance Schedule</h2>
+<div class="container">
 
-<form id="maintenanceForm">
+    <!-- LEFT PANEL -->
+    <div class="card">
 
-    <input type="text" id="affected_area" placeholder="Affected Area (map preview only)" required>
+        <h2>⚡ Create Maintenance</h2>
 
-    <!-- ================= BARANGAY-BASED APPROACH ================= -->
-    <label>Barangays Affected (PRIMARY FILTER)</label>
-    <select id="barangays" multiple required>
-        <option value="Bonuan Gueset">Bonuan Gueset</option>
-        <option value="Bonuan Boquig">Bonuan Boquig</option>
-        <option value="Bonuan Binloc">Bonuan Binloc</option>
+        <form id="maintenanceForm">
 
-        <option value="Lucao">Lucao</option>
-        <option value="Tapuac">Tapuac</option>
-        <option value="Tambac">Tambac</option>
-        <option value="Pantal">Pantal</option>
+            <div>
+                <label>Affected Areas</label>
 
-        <option value="Bacayao Norte">Bacayao Norte</option>
-        <option value="Bacayao Sur">Bacayao Sur</option>
+                <textarea
+                    id="affected_area"
+                    readonly
+                    placeholder="Selected barangays..."
+                ></textarea>
+            </div>
 
-        <option value="Malued">Malued</option>
-        <option value="Mayombo">Mayombo</option>
+            <div>
+                <label>Select Barangays</label>
 
-        <option value="Mangin">Mangin</option>
-        <option value="Tebeng">Tebeng</option>
+                <select id="barangays" multiple></select>
 
-        <option value="Pogo Chico">Pogo Chico</option>
-        <option value="Pogo Grande">Pogo Grande</option>
+                <small>
+                    Hold CTRL to select multiple barangays
+                </small>
+            </div>
 
-        <option value="Herrero">Herrero</option>
-        <option value="Poblacion Centro">Poblacion Centro</option>
-        <option value="Poblacion Oeste">Poblacion Oeste</option>
-        <option value="Poblacion Este">Poblacion Este</option>
-    </select>
+            <div class="checkbox-row">
+                <input type="checkbox" id="notify_all">
+                <label for="notify_all">
+                    Notify ALL Users
+                </label>
+            </div>
 
-    <small>Hold CTRL / tap to select multiple</small>
+            <div class="info-box">
+                If enabled, notifications will be sent to all users.
+            </div>
 
-    <div class="row">
-        <div>
-            <label>Maintenance Date</label>
-            <input type="date" id="maintenance_date" required>
+            <div>
+                <label>Maintenance Date</label>
+
+                <input
+                    type="date"
+                    id="maintenance_date"
+                    required
+                >
+            </div>
+
+            <div class="row">
+
+                <div>
+                    <label>Start Time</label>
+
+                    <input
+                        type="time"
+                        id="start_time"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label>End Time</label>
+
+                    <input
+                        type="time"
+                        id="end_time"
+                        required
+                    >
+                </div>
+
+            </div>
+
+            <div>
+                <label>Description</label>
+
+                <textarea
+                    id="description"
+                    rows="4"
+                    placeholder="Enter maintenance details..."
+                ></textarea>
+            </div>
+
+            <div>
+                <label>Notification Radius (meters)</label>
+
+                <input
+                    type="number"
+                    id="radius"
+                    value="2000"
+                    min="500"
+                >
+            </div>
+
+            <button type="submit" id="submitBtn">
+                Create Maintenance
+            </button>
+
+        </form>
+
+        <div id="status"></div>
+
+    </div>
+
+    <!-- MAP -->
+    <div class="card">
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+
+            <h2>📍 Maintenance Map</h2>
+
+            <span class="badge">
+                Click circles to select
+            </span>
+
         </div>
+
+        <div id="map"></div>
+
     </div>
 
-    <div class="row">
-        <input type="time" id="start_time" required>
-        <input type="time" id="end_time" required>
-    </div>
-
-    <textarea id="description" placeholder="Description"></textarea>
-
-    <!-- map preview only -->
-    <input type="hidden" id="latitude">
-    <input type="hidden" id="longitude">
-
-    <button type="submit" id="submitBtn">Create Maintenance</button>
-
-</form>
-
-<p id="status"></p>
-
-<div id="map"></div>
+</div>
 
 <script>
 
-/* ================= MAP ================= */
-let map = L.map('map').setView([16.0431, 120.3330], 13);
+/* =========================================
+   MAP
+========================================= */
+const map = L.map('map').setView([16.0431, 120.3330], 13);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: "© OpenStreetMap"
-}).addTo(map);
+L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+        attribution: '© OpenStreetMap'
+    }
+).addTo(map);
 
-let marker;
-let barangayLayer = {};
-
-/* ================= BARANGAY DATA ================= */
+/* =========================================
+   BARANGAY DATA
+========================================= */
 const barangayData = {
-    "Bonuan Gueset": { lat: 16.0585, lng: 120.3345 },
-    "Bonuan Boquig": { lat: 16.0600, lng: 120.3200 },
-    "Bonuan Binloc": { lat: 16.0620, lng: 120.3100 },
 
-    "Lucao": { lat: 16.0435, lng: 120.3310 },
-    "Tapuac": { lat: 16.0460, lng: 120.3450 },
-    "Tambac": { lat: 16.0520, lng: 120.3400 },
-    "Pantal": { lat: 16.0468, lng: 120.3330 },
+    "Bonuan Gueset": { lat:16.0585, lng:120.3345 },
+    "Bonuan Boquig": { lat:16.0600, lng:120.3200 },
+    "Bonuan Binloc": { lat:16.0620, lng:120.3100 },
+    "Lucao": { lat:16.0435, lng:120.3310 },
+    "Tapuac": { lat:16.0460, lng:120.3450 },
+    "Tambac": { lat:16.0520, lng:120.3400 },
+    "Pantal": { lat:16.0468, lng:120.3330 },
+    "Bacayao Norte": { lat:16.0300, lng:120.3200 },
+    "Bacayao Sur": { lat:16.0250, lng:120.3250 },
+    "Malued": { lat:16.0400, lng:120.3200 },
+    "Mayombo": { lat:16.0480, lng:120.3100 },
+    "Mangin": { lat:16.0550, lng:120.3500 },
+    "Tebeng": { lat:16.0600, lng:120.3450 },
+    "Pogo Chico": { lat:16.0510, lng:120.3600 },
+    "Pogo Grande": { lat:16.0550, lng:120.3650 },
+    "Herrero": { lat:16.0450, lng:120.3350 },
+    "Poblacion Centro": { lat:16.0430, lng:120.3335 },
+    "Poblacion Oeste": { lat:16.0410, lng:120.3300 },
+    "Poblacion Este": { lat:16.0440, lng:120.3360 }
 
-    "Bacayao Norte": { lat: 16.0300, lng: 120.3200 },
-    "Bacayao Sur": { lat: 16.0250, lng: 120.3250 },
-
-    "Malued": { lat: 16.0400, lng: 120.3200 },
-    "Mayombo": { lat: 16.0480, lng: 120.3100 },
-
-    "Mangin": { lat: 16.0550, lng: 120.3500 },
-    "Tebeng": { lat: 16.0600, lng: 120.3450 },
-
-    "Pogo Chico": { lat: 16.0510, lng: 120.3600 },
-    "Pogo Grande": { lat: 16.0550, lng: 120.3650 },
-
-    "Herrero": { lat: 16.0450, lng: 120.3350 },
-    "Poblacion Centro": { lat: 16.0430, lng: 120.3335 },
-    "Poblacion Oeste": { lat: 16.0410, lng: 120.3300 },
-    "Poblacion Este": { lat: 16.0440, lng: 120.3360 }
 };
 
-/* ================= CREATE CIRCLES (HIDDEN INITIALLY) ================= */
+/* =========================================
+   ELEMENTS
+========================================= */
+const barangaySelect =
+    document.getElementById("barangays");
+
+const affectedArea =
+    document.getElementById("affected_area");
+
+const notifyAllCheckbox =
+    document.getElementById("notify_all");
+
+const statusBox =
+    document.getElementById("status");
+
+const layers = {};
+
+/* =========================================
+   INIT BARANGAYS
+========================================= */
 Object.keys(barangayData).forEach(name => {
 
-    const b = barangayData[name];
+    /* SELECT OPTION */
+    const option = document.createElement("option");
 
-    const circle = L.circle([b.lat, b.lng], {
-        radius: 1200,
-        color: "#2ecc71",
-        fillColor: "#2ecc71",
-        fillOpacity: 0.0,   // hidden
-        weight: 1
+    option.value = name;
+    option.textContent = name;
+
+    barangaySelect.appendChild(option);
+
+    /* MAP CIRCLE */
+    const circle = L.circle(
+        [barangayData[name].lat, barangayData[name].lng],
+        {
+            radius:1200,
+            color:"#27ae60",
+            fillOpacity:0.2
+        }
+    ).addTo(map);
+
+    circle.bindPopup(`<b>${name}</b>`);
+
+    circle.on("click", () => {
+
+        option.selected = !option.selected;
+
+        updateSelections();
     });
 
-    circle.bindPopup(name);
-
-    barangayLayer[name] = circle;
-
-    circle.on("click", () => toggleBarangay(name));
+    layers[name] = circle;
 });
 
-/* ================= TOGGLE BARANGAY ================= */
-function toggleBarangay(name) {
+/* =========================================
+   UPDATE SELECTIONS
+========================================= */
+function updateSelections(){
 
-    const select = document.getElementById("barangays");
-    const option = [...select.options].find(o => o.value === name);
+    const selected =
+        [...barangaySelect.selectedOptions]
+        .map(o => o.value);
 
-    if (!option) return;
+    affectedArea.value =
+        selected.join(", ");
 
-    option.selected = !option.selected;
+    Object.keys(layers).forEach(name => {
 
-    syncBarangayState(name);
+        if(selected.includes(name)){
+
+            layers[name].setStyle({
+                color:"#e74c3c",
+                fillOpacity:0.5
+            });
+
+        }else{
+
+            layers[name].setStyle({
+                color:"#27ae60",
+                fillOpacity:0.2
+            });
+        }
+    });
 }
 
-/* ================= SYNC UI STATE ================= */
-function syncBarangayState(name) {
+/* =========================================
+   SELECT CHANGE
+========================================= */
+barangaySelect.addEventListener(
+    "change",
+    updateSelections
+);
 
-    const circle = barangayLayer[name];
-    const select = document.getElementById("barangays");
+/* =========================================
+   NOTIFY ALL
+========================================= */
+notifyAllCheckbox.addEventListener(
+    "change",
+    () => {
 
-    const isSelected = [...select.options]
-        .some(o => o.value === name && o.selected);
+        if(notifyAllCheckbox.checked){
 
-    if (isSelected) {
+            barangaySelect.disabled = true;
 
-        // SHOW
-        if (!map.hasLayer(circle)) {
-            circle.addTo(map);
+            [...barangaySelect.options]
+            .forEach(o => o.selected = false);
+
+            affectedArea.value = "ALL AREAS";
+
+        }else{
+
+            barangaySelect.disabled = false;
+
+            affectedArea.value = "";
         }
 
-        circle.setStyle({
-            color: "#e74c3c",
-            fillColor: "#e74c3c",
-            fillOpacity: 0.25,
-            weight: 2
-        });
-
-        map.panTo(circle.getLatLng());
-
-    } else {
-
-        // HIDE
-        if (map.hasLayer(circle)) {
-            map.removeLayer(circle);
-        }
+        updateSelections();
     }
-}
+);
 
-/* ================= DROPDOWN → MAP SYNC ================= */
-document.getElementById("barangays").addEventListener("change", function () {
-
-    Object.keys(barangayLayer).forEach(name => {
-        syncBarangayState(name);
-    });
-});
-
-/* ================= MAP CLICK (MARK LOCATION ONLY) ================= */
-map.on("click", function (e) {
-
-    const lat = e.latlng.lat;
-    const lng = e.latlng.lng;
-
-    document.getElementById("latitude").value = lat;
-    document.getElementById("longitude").value = lng;
-
-    if (marker) map.removeLayer(marker);
-
-    marker = L.marker([lat, lng]).addTo(map);
-});
-
-/* ================= SUBMIT ================= */
-document.getElementById("maintenanceForm").addEventListener("submit", async (e) => {
+/* =========================================
+   SUBMIT FORM
+========================================= */
+document
+.getElementById("maintenanceForm")
+.addEventListener("submit", async (e) => {
 
     e.preventDefault();
 
-    const status = document.getElementById("status");
-    const btn = document.getElementById("submitBtn");
+    const btn =
+        document.getElementById("submitBtn");
 
-    const barangays = Array.from(
-        document.getElementById("barangays").selectedOptions
-    ).map(opt => opt.value);
+    statusBox.innerHTML = "";
 
-    if (barangays.length === 0) {
-        status.innerText = "❌ Select at least 1 barangay";
-        return;
-    }
+    const barangays =
+        [...barangaySelect.selectedOptions]
+        .map(o => o.value);
 
     const payload = {
-        affected_area: document.getElementById("affected_area").value,
-        maintenance_date: document.getElementById("maintenance_date").value,
-        start_time: document.getElementById("start_time").value,
-        end_time: document.getElementById("end_time").value,
-        description: document.getElementById("description").value,
-        latitude: document.getElementById("latitude").value,
-        longitude: document.getElementById("longitude").value,
-        barangays: barangays
+
+        maintenance_date:
+            document.getElementById("maintenance_date").value,
+
+        start_time:
+            document.getElementById("start_time").value,
+
+        end_time:
+            document.getElementById("end_time").value,
+
+        description:
+            document.getElementById("description").value,
+
+        radius:
+            document.getElementById("radius").value,
+
+        notify_all:
+            notifyAllCheckbox.checked,
+
+        barangays
     };
 
-    try {
+    try{
 
         btn.disabled = true;
         btn.innerText = "Creating...";
 
-        console.log("PAYLOAD:", payload);
+        const response = await fetch(
+            "http://localhost/CrowdsourcedAPI/api/maintainance/create.php",
+            {
+                method:"POST",
 
-const res = await fetch(
-    "http://localhost/crowdsourcedapi/api/maintainance/create.php",
-    {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify(payload)
-    }
-);
+                headers:{
+                    "Content-Type":"application/json"
+                },
 
-const text = await res.text();
+                credentials:"include",
 
-console.log("RAW RESPONSE:", text);
+                body:JSON.stringify(payload)
+            }
+        );
 
-const result = JSON.parse(text);
+        const text = await response.text();
 
+        let result;
 
-        if (!result.success) throw new Error(result.message);
+        try{
 
-        status.innerText = "✅ " + result.message;
+            result = JSON.parse(text);
 
-        alert(`Maintenance created!\nBarangays: ${barangays.length}`);
+        }catch{
 
-        document.getElementById("maintenanceForm").reset();
+            throw new Error(
+                "Invalid JSON response:\n" + text
+            );
+        }
 
-        if (marker) map.removeLayer(marker);
+        if(!response.ok || !result.success){
 
-        // reset all circles
-        Object.values(barangayLayer).forEach(c => {
-            if (map.hasLayer(c)) map.removeLayer(c);
-        });
+            throw new Error(
+                result.message || "Request failed"
+            );
+        }
 
-    } catch (err) {
-        status.innerText = "❌ " + err.message;
-    } finally {
+        statusBox.innerHTML = `
+            <div class="success">
+                ✅ ${result.message}<br>
+                📢 Users Notified:
+                ${result.users_notified}
+            </div>
+        `;
+
+        alert(
+            "✅ Maintenance created successfully!"
+        );
+
+        /* RESET */
+        e.target.reset();
+
+        affectedArea.value = "";
+
+        barangaySelect.disabled = false;
+
+        [...barangaySelect.options]
+        .forEach(o => o.selected = false);
+
+        updateSelections();
+
+    }catch(err){
+
+        console.error(err);
+
+        statusBox.innerHTML = `
+            <div class="error">
+                ❌ ${err.message}
+            </div>
+        `;
+
+    }finally{
+
         btn.disabled = false;
+
         btn.innerText = "Create Maintenance";
     }
 });

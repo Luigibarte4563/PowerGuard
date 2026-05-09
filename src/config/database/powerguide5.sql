@@ -44,20 +44,30 @@ CREATE TABLE electric_companies (
 CREATE TABLE maintenance_schedules (
     id INT AUTO_INCREMENT PRIMARY KEY,
     electric_company_id INT NOT NULL,
+
     affected_area VARCHAR(255),
     latitude DECIMAL(10,8) NOT NULL,
     longitude DECIMAL(11,8) NOT NULL,
+
     affected_barangays JSON NOT NULL,
     radius INT DEFAULT 2000,
+
     maintenance_date DATE NOT NULL,
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
+
     description TEXT,
+
     estimated_restoration_time DATETIME NULL,
+
     status ENUM('upcoming','ongoing','completed','cancelled') DEFAULT 'upcoming',
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (electric_company_id) REFERENCES electric_companies(id) ON DELETE CASCADE
+
+    FOREIGN KEY (electric_company_id)
+        REFERENCES electric_companies(id)
+        ON DELETE CASCADE
 );
 
 -- OUTAGE REPORTS
@@ -140,15 +150,29 @@ CREATE INDEX idx_availability ON power_stations(availability_status);
 CREATE INDEX idx_station_location ON power_stations(latitude, longitude);
 CREATE INDEX idx_created_by ON power_stations(created_by);
 -- NOTIFICATIONS (API HANDLED)
+
 CREATE TABLE notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
+
     user_id INT NOT NULL,
+
     title VARCHAR(255),
     message TEXT,
+
     type ENUM('maintenance','outage','emergency','system') DEFAULT 'maintenance',
+
     is_read BOOLEAN DEFAULT FALSE,
+
+    -- 🔥 CORE LINK (THIS IS THE MERGE PART)
+    maintenance_id INT NULL,
+
     source_type ENUM('maintenance','outage','system') NULL,
-    source_id INT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+
+    FOREIGN KEY (maintenance_id)
+        REFERENCES maintenance_schedules(id)
+        ON DELETE CASCADE
 );

@@ -439,7 +439,7 @@ async function loadNotifications(){
     try{
 
         const res = await fetch(
-            "http://localhost/crowdsourcedapi/api/notifications/get_notifications.php",
+            "http://localhost/crowdsourcedapi/api/notification/get.php",
             { credentials:"include" }
         );
 
