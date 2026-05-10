@@ -1,18 +1,11 @@
 <!-- =========================================
-     LEAFLET MAP
+     LEAFLET MAP (FIXED + CLEAN)
 ========================================= -->
-<link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet/dist/leaflet.css"
-/>
-
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
 
-/* =========================================
-   MAP CARD
-========================================= */
 .map-card{
     background:#fff;
     padding:15px;
@@ -27,9 +20,6 @@
     border-radius:12px;
 }
 
-/* =========================================
-   POPUP
-========================================= */
 .map-popup{
     font-size:14px;
     line-height:1.5;
@@ -37,32 +27,19 @@
 
 .map-popup h4{
     margin:0 0 8px;
-    color:#333;
-}
-
-.map-popup small{
-    color:#666;
 }
 
 </style>
 
-<!-- =========================================
-     MAP CONTAINER
-========================================= -->
 <div class="map-card">
-
     <h2>Upcoming Maintenance Map</h2>
-
     <div id="maintenanceMap"></div>
-
 </div>
 
 <script>
 
-/* =========================================
-   GLOBAL MAP
-========================================= */
 let maintenanceMap;
+let layers = [];
 
 /* =========================================
    INIT MAP
@@ -74,17 +51,25 @@ function initMaintenanceMap(){
         11
     );
 
-    L.tileLayer(
-        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        {
-            attribution:
-                '&copy; OpenStreetMap contributors'
-        }
-    ).addTo(maintenanceMap);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(maintenanceMap);
 }
 
 /* =========================================
-   LOAD MAINTENANCE MAP
+   CLEAR MAP (SAFE)
+========================================= */
+function clearMap(){
+
+    layers.forEach(layer => {
+        if (layer) maintenanceMap.removeLayer(layer);
+    });
+
+    layers = [];
+}
+
+/* =========================================
+   LOAD DATA
 ========================================= */
 async function loadMaintenanceMap(){
 
@@ -92,105 +77,93 @@ async function loadMaintenanceMap(){
 
         const response = await fetch(
             "http://localhost/crowdsourcedapi/api/maintenance/get.php",
-            {
-                credentials:"include"
-            }
+            { credentials: "include" }
         );
 
         const data = await response.json();
 
-        if(!data.success){
-            throw new Error(data.message);
+        if (!data.success) {
+            throw new Error(data.message || "API error");
         }
+
+        clearMap();
 
         const maintenances = data.data || [];
 
-        /* =====================================
-           CLEAR OLD LAYERS
-        ===================================== */
-        maintenanceMap.eachLayer(layer => {
-
-            if(
-                layer instanceof L.Marker ||
-                layer instanceof L.Circle
-            ){
-                maintenanceMap.removeLayer(layer);
-            }
-        });
-
-        /* =====================================
-           LOOP MAINTENANCE
-        ===================================== */
         maintenances.forEach(item => {
 
-            const lat = parseFloat(item.latitude);
-            const lng = parseFloat(item.longitude);
-
-            if(!lat || !lng) return;
-
+            const locations = item.locations || [];
             const radius = parseInt(item.radius || 2000);
 
-            /* =================================
-               MARKER
-            ================================= */
-            const marker = L.marker([lat, lng]).addTo(
-                maintenanceMap
-            );
+            let validLocations = [];
 
-            marker.bindPopup(`
-                <div class="map-popup">
+            locations.forEach(loc => {
 
-                    <h4>
-                        ⚡ Scheduled Maintenance
-                    </h4>
+                const lat = parseFloat(loc.latitude);
+                const lng = parseFloat(loc.longitude);
 
-                    <b>Location:</b>
-                    ${item.affected_area || "Unknown"}
-                    <br>
+                if (isNaN(lat) || isNaN(lng)) return;
 
-                    <b>Date:</b>
-                    ${item.maintenance_date}
-                    <br>
+                validLocations.push({ lat, lng });
 
-                    <b>Time:</b>
-                    ${item.start_time} -
-                    ${item.end_time}
-                    <br>
+                const marker = L.marker([lat, lng]).addTo(maintenanceMap);
 
-                    <b>Radius:</b>
-                    ${radius} meters
-                    <br><br>
+                marker.bindPopup(`
+                    <div class="map-popup">
 
-                    <small>
-                        ${item.description || ""}
-                    </small>
+                        <h4>⚡ Maintenance</h4>
 
-                </div>
-            `);
+                        <b>Barangay:</b> ${loc.barangay_name}<br>
+                        <b>Company:</b> ${item.company_name}<br>
+                        <b>Status:</b> ${item.status}<br><br>
 
-            /* =================================
-               AFFECTED RADIUS CIRCLE
-            ================================= */
-            L.circle([lat, lng], {
+                        <b>Date:</b> ${item.maintenance_date}<br>
+                        <b>Time:</b> ${item.start_time} - ${item.end_time}<br>
 
-                radius: radius,
+                        <small>${item.description || ""}</small>
 
-                color: '#ff3b30',
+                    </div>
+                `);
 
-                fillColor: '#ff3b30',
+                layers.push(marker);
+            });
 
-                fillOpacity: 0.25
+            /* =========================================
+               DRAW CIRCLE ONLY IF VALID DATA EXISTS
+            ========================================= */
+            if (validLocations.length > 0) {
 
-            }).addTo(maintenanceMap);
+                let centerLat = 0;
+                let centerLng = 0;
+
+                validLocations.forEach(p => {
+                    centerLat += p.lat;
+                    centerLng += p.lng;
+                });
+
+                const avgLat = centerLat / validLocations.length;
+                const avgLng = centerLng / validLocations.length;
+
+                const circle = L.circle([avgLat, avgLng], {
+
+                    radius: radius,
+                    color: '#ff3b30',
+                    weight: 2,
+                    fillColor: '#ff3b30',
+                    fillOpacity: 0.25
+
+                }).addTo(maintenanceMap);
+
+                layers.push(circle);
+            }
 
         });
 
-    }catch(err){
+        // refresh rendering safety
+        maintenanceMap.invalidateSize();
 
-        console.error(
-            "Maintenance Map Error:",
-            err
-        );
+    } catch(err) {
+        console.error("Maintenance Map Error:", err);
     }
 }
 
