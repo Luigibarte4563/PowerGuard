@@ -306,7 +306,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
    BARANGAY DATA
 ========================================= */
 const barangayData = {
-
     "Bonuan Gueset": { lat:16.0585, lng:120.3345 },
     "Bonuan Boquig": { lat:16.0600, lng:120.3200 },
     "Bonuan Binloc": { lat:16.0620, lng:120.3100 },
@@ -335,6 +334,7 @@ const barangaySelect = document.getElementById("barangays");
 const affectedArea = document.getElementById("affected_area");
 const notifyAllCheckbox = document.getElementById("notify_all");
 const statusBox = document.getElementById("status");
+
 const layers = {};
 
 /* =========================================
@@ -418,7 +418,7 @@ notifyAllCheckbox.addEventListener("change", () => {
 });
 
 /* =========================================
-   SUBMIT
+   SUBMIT (UPDATED FOR NEW BACKEND)
 ========================================= */
 document.getElementById("maintenanceForm")
 .addEventListener("submit", async (e) => {
@@ -431,7 +431,6 @@ document.getElementById("maintenanceForm")
     const selectedBarangays = [...barangaySelect.selectedOptions]
         .map(o => o.value);
 
-    /* IMPORTANT: backend expects location_name */
     const payload = {
 
         maintenance_date: document.getElementById("maintenance_date").value,
@@ -442,10 +441,8 @@ document.getElementById("maintenanceForm")
 
         notify_all: notifyAllCheckbox.checked,
 
-        /* FIX: send first selected barangay as location_name */
-        location_name: notifyAllCheckbox.checked
-            ? "ALL AREAS"
-            : (selectedBarangays[0] || "")
+        // ✅ FIX: send actual selected barangays only
+        barangays: selectedBarangays
     };
 
     try {
@@ -508,6 +505,5 @@ document.getElementById("maintenanceForm")
 });
 
 </script>
-
 </body>
 </html>
