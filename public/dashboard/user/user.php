@@ -377,58 +377,101 @@ async function loadDashboardStats(){
     try{
 
         /* ===============================
+           ELEMENTS
+        =============================== */
+        const totalReportsEl =
+            document.getElementById("totalReports");
+
+        const activeOutagesEl =
+            document.getElementById("activeOutages");
+
+        const maintenanceCountEl =
+            document.getElementById("maintenanceCount");
+
+        /* ===============================
            LOAD MY REPORTS
         =============================== */
         const myReportsRes = await fetch(
             "http://localhost/crowdsourcedapi/api/outage_report/get_my_report.php",
-            { credentials:"include" }
+            {
+                credentials:"include"
+            }
         );
 
-        const myReportsData = await myReportsRes.json();
+        const myReportsData =
+            await myReportsRes.json();
 
-        if(myReportsData.success){
+        if(
+            myReportsData.success &&
+            totalReportsEl
+        ){
 
-            document.getElementById("totalReports").innerText =
+            totalReportsEl.innerText =
                 myReportsData.count ?? 0;
         }
 
         /* ===============================
-           LOAD ACTIVE OUTAGES (FIXED)
+           LOAD ACTIVE OUTAGES
         =============================== */
         const activeRes = await fetch(
             "http://localhost/crowdsourcedapi/api/outage_report/get_active.php",
-            { credentials:"include" }
+            {
+                credentials:"include"
+            }
         );
 
-        const activeData = await activeRes.json();
+        const activeData =
+            await activeRes.json();
 
-        if(activeData.success){
+        if(
+            activeData.success &&
+            activeOutagesEl
+        ){
 
-            /* FIX: backend uses total_active_reports */
-            document.getElementById("activeOutages").innerText =
-                activeData.total_active_reports ?? activeData.count ?? 0;
+            activeOutagesEl.innerText =
+                activeData.total_active_reports ??
+                activeData.count ??
+                0;
         }
 
         /* ===============================
-           LOAD MAINTENANCE
+           LOAD UPCOMING MAINTENANCE
         =============================== */
         const maintenanceRes = await fetch(
-            "http://localhost/crowdsourcedapi/api/maintenance/get_all.php",
-            { credentials:"include" }
+            "http://localhost/crowdsourcedapi/api/maintenance/get_upcoming.php",
+            {
+                credentials:"include"
+            }
         );
 
-        const maintenanceData = await maintenanceRes.json();
+        const maintenanceData =
+            await maintenanceRes.json();
 
-        if(maintenanceData.success){
+        if(
+            maintenanceData.success &&
+            maintenanceCountEl
+        ){
 
-            document.getElementById("maintenanceCount").innerText =
-                maintenanceData.count ?? 0;
+            /* FIX:
+               uses upcoming_count from API
+            */
+            maintenanceCountEl.innerText =
+                maintenanceData.upcoming_count ??
+                maintenanceData.count ??
+                0;
         }
 
     }catch(err){
-        console.error("Dashboard Stats Error:", err);
+
+        console.error(
+            "Dashboard Stats Error:",
+            err
+        );
     }
 }
+
+/* LOAD */
+loadDashboardStats();
 
 /* =========================================
    NOTIFICATIONS
