@@ -298,12 +298,9 @@ button:disabled{
 ========================================= */
 const map = L.map('map').setView([16.0431, 120.3330], 13);
 
-L.tileLayer(
-    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    {
-        attribution: '© OpenStreetMap'
-    }
-).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+}).addTo(map);
 
 /* =========================================
    BARANGAY DATA
@@ -329,24 +326,15 @@ const barangayData = {
     "Poblacion Centro": { lat:16.0430, lng:120.3335 },
     "Poblacion Oeste": { lat:16.0410, lng:120.3300 },
     "Poblacion Este": { lat:16.0440, lng:120.3360 }
-
 };
 
 /* =========================================
    ELEMENTS
 ========================================= */
-const barangaySelect =
-    document.getElementById("barangays");
-
-const affectedArea =
-    document.getElementById("affected_area");
-
-const notifyAllCheckbox =
-    document.getElementById("notify_all");
-
-const statusBox =
-    document.getElementById("status");
-
+const barangaySelect = document.getElementById("barangays");
+const affectedArea = document.getElementById("affected_area");
+const notifyAllCheckbox = document.getElementById("notify_all");
+const statusBox = document.getElementById("status");
 const layers = {};
 
 /* =========================================
@@ -354,30 +342,24 @@ const layers = {};
 ========================================= */
 Object.keys(barangayData).forEach(name => {
 
-    /* SELECT OPTION */
     const option = document.createElement("option");
-
     option.value = name;
     option.textContent = name;
-
     barangaySelect.appendChild(option);
 
-    /* MAP CIRCLE */
     const circle = L.circle(
         [barangayData[name].lat, barangayData[name].lng],
         {
-            radius:1200,
-            color:"#27ae60",
-            fillOpacity:0.2
+            radius: 1200,
+            color: "#27ae60",
+            fillOpacity: 0.2
         }
     ).addTo(map);
 
     circle.bindPopup(`<b>${name}</b>`);
 
     circle.on("click", () => {
-
         option.selected = !option.selected;
-
         updateSelections();
     });
 
@@ -385,179 +367,130 @@ Object.keys(barangayData).forEach(name => {
 });
 
 /* =========================================
-   UPDATE SELECTIONS
+   UPDATE UI
 ========================================= */
-function updateSelections(){
+function updateSelections() {
 
-    const selected =
-        [...barangaySelect.selectedOptions]
+    const selected = [...barangaySelect.selectedOptions]
         .map(o => o.value);
 
-    affectedArea.value =
-        selected.join(", ");
+    affectedArea.value = selected.join(", ");
 
     Object.keys(layers).forEach(name => {
 
-        if(selected.includes(name)){
-
+        if (selected.includes(name)) {
             layers[name].setStyle({
-                color:"#e74c3c",
-                fillOpacity:0.5
+                color: "#e74c3c",
+                fillOpacity: 0.5
             });
-
-        }else{
-
+        } else {
             layers[name].setStyle({
-                color:"#27ae60",
-                fillOpacity:0.2
+                color: "#27ae60",
+                fillOpacity: 0.2
             });
         }
     });
 }
 
-/* =========================================
-   SELECT CHANGE
-========================================= */
-barangaySelect.addEventListener(
-    "change",
-    updateSelections
-);
+barangaySelect.addEventListener("change", updateSelections);
 
 /* =========================================
    NOTIFY ALL
 ========================================= */
-notifyAllCheckbox.addEventListener(
-    "change",
-    () => {
+notifyAllCheckbox.addEventListener("change", () => {
 
-        if(notifyAllCheckbox.checked){
+    if (notifyAllCheckbox.checked) {
 
-            barangaySelect.disabled = true;
+        barangaySelect.disabled = true;
 
-            [...barangaySelect.options]
+        [...barangaySelect.options]
             .forEach(o => o.selected = false);
 
-            affectedArea.value = "ALL AREAS";
+        affectedArea.value = "ALL AREAS";
 
-        }else{
+    } else {
 
-            barangaySelect.disabled = false;
-
-            affectedArea.value = "";
-        }
-
-        updateSelections();
+        barangaySelect.disabled = false;
+        affectedArea.value = "";
     }
-);
+
+    updateSelections();
+});
 
 /* =========================================
-   SUBMIT FORM
+   SUBMIT
 ========================================= */
-document
-.getElementById("maintenanceForm")
+document.getElementById("maintenanceForm")
 .addEventListener("submit", async (e) => {
 
     e.preventDefault();
 
-    const btn =
-        document.getElementById("submitBtn");
-
+    const btn = document.getElementById("submitBtn");
     statusBox.innerHTML = "";
 
-    const barangays =
-        [...barangaySelect.selectedOptions]
+    const selectedBarangays = [...barangaySelect.selectedOptions]
         .map(o => o.value);
 
+    /* IMPORTANT: backend expects location_name */
     const payload = {
 
-        maintenance_date:
-            document.getElementById("maintenance_date").value,
+        maintenance_date: document.getElementById("maintenance_date").value,
+        start_time: document.getElementById("start_time").value,
+        end_time: document.getElementById("end_time").value,
+        description: document.getElementById("description").value,
+        radius: document.getElementById("radius").value,
 
-        start_time:
-            document.getElementById("start_time").value,
+        notify_all: notifyAllCheckbox.checked,
 
-        end_time:
-            document.getElementById("end_time").value,
-
-        description:
-            document.getElementById("description").value,
-
-        radius:
-            document.getElementById("radius").value,
-
-        notify_all:
-            notifyAllCheckbox.checked,
-
-        barangays
+        /* FIX: send first selected barangay as location_name */
+        location_name: notifyAllCheckbox.checked
+            ? "ALL AREAS"
+            : (selectedBarangays[0] || "")
     };
 
-    try{
+    try {
 
         btn.disabled = true;
         btn.innerText = "Creating...";
 
         const response = await fetch(
-            "http://localhost/CrowdsourcedAPI/api/maintainance/create.php",
+            "http://localhost/CrowdsourcedAPI/api/maintenance/create.php",
             {
-                method:"POST",
-
-                headers:{
-                    "Content-Type":"application/json"
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
                 },
-
-                credentials:"include",
-
-                body:JSON.stringify(payload)
+                credentials: "include",
+                body: JSON.stringify(payload)
             }
         );
 
-        const text = await response.text();
+        const result = await response.json();
 
-        let result;
-
-        try{
-
-            result = JSON.parse(text);
-
-        }catch{
-
-            throw new Error(
-                "Invalid JSON response:\n" + text
-            );
-        }
-
-        if(!response.ok || !result.success){
-
-            throw new Error(
-                result.message || "Request failed"
-            );
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || "Request failed");
         }
 
         statusBox.innerHTML = `
             <div class="success">
                 ✅ ${result.message}<br>
-                📢 Users Notified:
-                ${result.users_notified}
+                📢 Users Notified: ${result.users_notified}
             </div>
         `;
 
-        alert(
-            "✅ Maintenance created successfully!"
-        );
+        alert("✅ Maintenance created successfully!");
 
         /* RESET */
         e.target.reset();
-
         affectedArea.value = "";
-
         barangaySelect.disabled = false;
 
         [...barangaySelect.options]
-        .forEach(o => o.selected = false);
+            .forEach(o => o.selected = false);
 
         updateSelections();
 
-    }catch(err){
+    } catch (err) {
 
         console.error(err);
 
@@ -567,10 +500,9 @@ document
             </div>
         `;
 
-    }finally{
+    } finally {
 
         btn.disabled = false;
-
         btn.innerText = "Create Maintenance";
     }
 });

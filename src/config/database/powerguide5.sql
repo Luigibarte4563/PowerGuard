@@ -163,10 +163,11 @@ CREATE TABLE notifications (
 
     is_read BOOLEAN DEFAULT FALSE,
 
-    -- 🔥 CORE LINK (THIS IS THE MERGE PART)
     maintenance_id INT NULL,
 
     source_type ENUM('maintenance','outage','system') NULL,
+
+    location VARCHAR(255) NULL,  -- ✅ added location
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
