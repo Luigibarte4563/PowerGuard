@@ -9,7 +9,7 @@ $conn = getConnection();
 
 if (!isset($_SESSION['user'])) {
 
-    header("Location: " . BASE_URL . "/auth/auth.php?page=login");
+    header("Location: " . PUBLIC_URL . "/auth/auth.php?page=login");
     exit();
 }
 
@@ -21,13 +21,13 @@ $confirm = $_POST['confirm_password'] ?? '';
 
 if (empty($current) || empty($new) || empty($confirm)) {
 
-    header("Location: " . BASE_URL . "/dashboard/user/user.php?error=empty_fields");
+    header("Location: " . PUBLIC_URL . "/dashboard/user/user.php?error=empty_fields");
     exit();
 }
 
 if ($new !== $confirm) {
 
-    header("Location: " . BASE_URL . "/dashboard/user/user.php?error=password_mismatch");
+    header("Location: " . PUBLIC_URL . "/dashboard/user/user.php?error=password_mismatch");
     exit();
 }
 
@@ -37,7 +37,7 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!password_verify($current, $user['password'])) {
 
-    header("Location: " . BASE_URL . "/dashboard/user/user.php?error=wrong_password");
+    header("Location: " . PUBLIC_URL . "/dashboard/user/user.php?error=wrong_password");
     exit();
 }
 
@@ -51,6 +51,6 @@ $stmt = $conn->prepare("
 
 $stmt->execute([$newHashed, $user_id]);
 
-header("Location: " . BASE_URL . "/dashboard/user/user.php?success=password_updated");
+header("Location: " . PUBLIC_URL . "/dashboard/user/user.php?success=password_updated");
 exit();
 ?>

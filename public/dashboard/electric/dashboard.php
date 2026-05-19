@@ -83,10 +83,10 @@ button {
 <nav>
     <b>ELECTRIC COMPANY PANEL</b>
     <div>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="outages.php">Outages</a>
-        <a href="maintenance.php">Maintenance</a>
-        <a href="<?= BASE_URL ?>/logout.php">Logout</a>
+        <a href="#">Dashboard</a>
+        <a href="<?= PUBLIC_URL ?>/dashboard/electric/reports/update.php">Outages</a>
+        <a href="<?= PUBLIC_URL ?>/dashboard/electric/maintenance/create_maintenance.php">Maintenance</a>
+        <a href="<?= PUBLIC_URL ?>/logout.php">Logout</a>
     </div>
 </nav>
 

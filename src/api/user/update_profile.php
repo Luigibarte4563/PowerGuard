@@ -7,38 +7,43 @@ require_once __DIR__ . '/../../../src/config/app.php';
 
 $conn = getConnection();
 
+/* =========================
+   AUTH CHECK
+========================= */
 if (!isset($_SESSION['user'])) {
-
-    header("Location: " . BASE_URL . "/auth/auth.php?page=login");
+    header("Location: " . PUBLIC_URL . "/auth/auth.php?page=login");
     exit();
 }
 
+/* =========================
+   METHOD CHECK
+========================= */
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-
-    header("Location: " . BASE_URL . "/dashboard/user/user.php");
+    header("Location: " . PUBLIC_URL . "/dashboard/user/user.php");
     exit();
 }
 
-$name = trim($_POST['name'] ?? '');
+/* =========================
+   INPUT
+========================= */
+$name  = trim($_POST['name'] ?? '');
 $email = trim($_POST['email'] ?? '');
 
-if (empty($name) || empty($email)) {
-
-    header("Location: " . BASE_URL . "/dashboard/update_profile.php?error=empty_fields");
+if ($name === '' || $email === '') {
+    header("Location: " . PUBLIC_URL . "/dashboard/update_profile.php?error=empty_fields");
     exit();
 }
 
-/*
-|--------------------------------------------------------------------------
-| IMAGE UPLOAD
-|--------------------------------------------------------------------------
-*/
+/* =========================
+   IMAGE UPLOAD
+========================= */
 $picturePath = null;
 
 if (isset($_FILES['picture']) && $_FILES['picture']['error'] === 0) {
 
     $uploadDir = __DIR__ . "/../../../public/uploads/";
 
+    // ensure folder exists
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
@@ -46,28 +51,26 @@ if (isset($_FILES['picture']) && $_FILES['picture']['error'] === 0) {
     $fileName = time() . "_" . basename($_FILES["picture"]["name"]);
     $targetFile = $uploadDir . $fileName;
 
-    $imageFileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
+    // safer extension check
+    $imageFileType = strtolower(pathinfo($_FILES["picture"]["name"], PATHINFO_EXTENSION));
 
-    // allow only images
-    $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
     if (!in_array($imageFileType, $allowed)) {
-
-        header("Location: " . BASE_URL . "/dashboard/update_profile.php?error=invalid_image");
+        header("Location: " . PUBLIC_URL . "/dashboard/update_profile.php?error=invalid_image");
         exit();
     }
 
     if (move_uploaded_file($_FILES["picture"]["tmp_name"], $targetFile)) {
 
-        $picturePath = "/PowerGuide/public/uploads/" . $fileName;
+        // ✅ FIXED: correct public URL path (NO HARDCODED PowerGuide)
+        $picturePath = PUBLIC_URL . "/uploads/" . $fileName;
     }
 }
 
-/*
-|--------------------------------------------------------------------------
-| UPDATE QUERY
-|--------------------------------------------------------------------------
-*/
+/* =========================
+   UPDATE DATABASE
+========================= */
 $user_id = $_SESSION['user']['id'];
 
 if ($picturePath) {
@@ -89,11 +92,9 @@ if ($picturePath) {
     $stmt->execute([$name, $email, $user_id]);
 }
 
-/*
-|--------------------------------------------------------------------------
-| UPDATE SESSION
-|--------------------------------------------------------------------------
-*/
+/* =========================
+   UPDATE SESSION
+========================= */
 $_SESSION['user']['name'] = $name;
 $_SESSION['user']['email'] = $email;
 
@@ -101,10 +102,8 @@ if ($picturePath) {
     $_SESSION['user']['picture'] = $picturePath;
 }
 
-/*
-|--------------------------------------------------------------------------
-| REDIRECT
-|--------------------------------------------------------------------------
-*/
-header("Location: " . BASE_URL . "/dashboard/user/user.php?success=1");
+/* =========================
+   REDIRECT SUCCESS
+========================= */
+header("Location: " . PUBLIC_URL . "/dashboard/user/user.php?success=1");
 exit();

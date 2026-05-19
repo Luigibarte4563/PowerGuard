@@ -28,17 +28,17 @@ if ($_SERVER['REQUEST_METHOD'] === "POST") {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user) {
-        header("Location: " . BASE_URL . "/auth/auth.php?page=login&error=User not found");
+        header("Location: " . PUBLIC_URL . "/auth/auth.php?page=login&error=User not found");
         exit;
     }
 
     if ($user['account_status'] !== 'active') {
-        header("Location: " . BASE_URL . "/auth/auth.php?page=login&error=Account disabled");
+        header("Location: " . PUBLIC_URL . "/auth/auth.php?page=login&error=Account disabled");
         exit;
     }
 
     if (!password_verify($password, $user['password'])) {
-        header("Location: " . BASE_URL . "/auth/auth.php?page=login&error=Invalid credentials");
+        header("Location: " . PUBLIC_URL . "/auth/auth.php?page=login&error=Invalid credentials");
         exit;
     }
 
@@ -89,11 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === "POST") {
        ROLE REDIRECT FIXED
     ========================= */
     if ($user['role'] === "admin") {
-        header("Location: " . BASE_URL . "/dashboard/admin/dashboard.php");
+        header("Location: " . PUBLIC_URL . "/dashboard/admin/dashboard.php");
     } elseif ($user['role'] === "electric_company") {
-        header("Location: " . BASE_URL . "/dashboard/electric/dashboard.php");
+        header("Location: " . PUBLIC_URL . "/dashboard/electric/dashboard.php");
     } else {
-        header("Location: " . BASE_URL . "/dashboard/user/user.php");
+        header("Location: " . PUBLIC_URL . "/dashboard/user/user.php");
     }
 
     exit;

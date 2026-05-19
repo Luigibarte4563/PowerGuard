@@ -1,7 +1,9 @@
 <?php
 
 if (!defined('BASE_URL')) {
-    define("BASE_URL", "/PowerGuide/public");
+    define("BASE_URL", "/PowerGuide");
 }
 
-define("APP_NAME", "PowerGuide");
+if (!defined('PUBLIC_URL')) {
+    define("PUBLIC_URL", "/PowerGuide/public");
+}
