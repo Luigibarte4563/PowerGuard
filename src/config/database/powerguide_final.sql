@@ -11,12 +11,11 @@ CREATE TABLE users (
     picture TEXT NULL,
     auth_provider ENUM('local','google') NOT NULL DEFAULT 'local',
     role ENUM('user','electric_company') DEFAULT 'user',
-    account_status ENUM('active','suspended','banned') DEFAULT 'active',
-    is_verified BOOLEAN DEFAULT FALSE,
     refresh_token TEXT NULL,
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP 
+        ON UPDATE CURRENT_TIMESTAMP,
     location_name VARCHAR(255) NULL,
     latitude DECIMAL(10,8) NULL,
     longitude DECIMAL(11,8) NULL

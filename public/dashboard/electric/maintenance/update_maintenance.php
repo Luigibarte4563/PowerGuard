@@ -1,11 +1,7 @@
-<!-- =========================================
-     LEAFLET MAP + LIST + EDIT MODAL (STABLE VERSION)
-========================================= -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-
 .wrapper{
     display:grid;
     grid-template-columns:350px 1fr;
@@ -14,7 +10,6 @@
     font-family:Arial;
 }
 
-/* LIST */
 .list-card{
     background:#fff;
     padding:15px;
@@ -29,6 +24,12 @@
     padding:10px;
     border-radius:10px;
     margin-bottom:10px;
+    transition:0.3s;
+}
+
+.item.done{
+    opacity:0.5;
+    background:#f5f5f5;
 }
 
 .item h4{ margin:0; }
@@ -39,6 +40,18 @@
     margin-top:5px;
 }
 
+.status{
+    display:inline-block;
+    margin-top:5px;
+    font-size:12px;
+    padding:3px 8px;
+    border-radius:5px;
+}
+
+.status.done{ background:#2ecc71; color:white; }
+.status.pending{ background:#f39c12; color:white; }
+.status.ongoing{ background:#3498db; color:white; }
+
 .btn{
     margin-top:8px;
     padding:6px 10px;
@@ -48,12 +61,8 @@
     font-size:12px;
 }
 
-.edit{
-    background:#3498db;
-    color:white;
-}
+.edit{ background:#3498db; color:white; }
 
-/* MAP */
 .map-card{
     background:#fff;
     padding:15px;
@@ -67,7 +76,6 @@
     border-radius:12px;
 }
 
-/* MODAL */
 #editModal{
     display:none;
     position:fixed;
@@ -89,7 +97,8 @@
 }
 
 .modal-box input,
-.modal-box textarea{
+.modal-box textarea,
+.modal-box select{
     width:100%;
     padding:8px;
     margin-top:5px;
@@ -106,18 +115,15 @@
 
 .save{ background:#27ae60; color:white; }
 .close{ background:#e74c3c; color:white; margin-top:8px; }
-
 </style>
 
 <div class="wrapper">
 
-    <!-- LIST -->
     <div class="list-card">
         <h3>📋 Maintenance List</h3>
         <div id="maintenanceList"></div>
     </div>
 
-    <!-- MAP -->
     <div class="map-card">
         <h3>🗺️ Map View</h3>
         <div id="maintenanceMap"></div>
@@ -125,7 +131,7 @@
 
 </div>
 
-<!-- EDIT MODAL -->
+<!-- MODAL -->
 <div id="editModal">
     <div class="modal-box">
 
@@ -148,6 +154,15 @@
         <label>Radius</label>
         <input type="number" id="edit_radius">
 
+        <!-- STATUS (MANUAL ONLY) -->
+        <label>Status (Optional Override)</label>
+        <select id="edit_status">
+            <option value="">Auto (based on time)</option>
+            <option value="pending">Pending</option>
+            <option value="ongoing">Ongoing</option>
+            <option value="done">Done</option>
+        </select>
+
         <button class="save" onclick="submitUpdate()">Save Update</button>
         <button class="close" onclick="closeModal()">Close</button>
 
@@ -156,9 +171,6 @@
 
 <script>
 
-/* =========================================
-   MAP INIT
-========================================= */
 let map;
 let layers = [];
 
@@ -167,7 +179,21 @@ const barangayData = {
     "Bonuan Boquig": { lat:16.0600, lng:120.3200 },
     "Bonuan Binloc": { lat:16.0620, lng:120.3100 },
     "Lucao": { lat:16.0435, lng:120.3310 },
-    "Tapuac": { lat:16.0460, lng:120.3450 }
+    "Tapuac": { lat:16.0460, lng:120.3450 },
+    "Tambac": { lat:16.0520, lng:120.3400 },
+    "Pantal": { lat:16.0468, lng:120.3330 },
+    "Bacayao Norte": { lat:16.0300, lng:120.3200 },
+    "Bacayao Sur": { lat:16.0250, lng:120.3250 },
+    "Malued": { lat:16.0400, lng:120.3200 },
+    "Mayombo": { lat:16.0480, lng:120.3100 },
+    "Mangin": { lat:16.0550, lng:120.3500 },
+    "Tebeng": { lat:16.0600, lng:120.3450 },
+    "Pogo Chico": { lat:16.0510, lng:120.3600 },
+    "Pogo Grande": { lat:16.0550, lng:120.3650 },
+    "Herrero": { lat:16.0450, lng:120.3350 },
+    "Poblacion Centro": { lat:16.0430, lng:120.3335 },
+    "Poblacion Oeste": { lat:16.0410, lng:120.3300 },
+    "Poblacion Este": { lat:16.0440, lng:120.3360 }
 };
 
 function initMap(){
@@ -176,21 +202,28 @@ function initMap(){
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
         attribution:'© OpenStreetMap'
     }).addTo(map);
+
+    setTimeout(() => map.invalidateSize(), 500);
 }
 
-/* =========================================
-   CLEAR MAP (FIXED)
-========================================= */
 function clearMap(){
-    layers.forEach(l => {
-        if(l) map.removeLayer(l);
-    });
+    layers.forEach(l => map.removeLayer(l));
     layers = [];
 }
 
-/* =========================================
-   LOAD DATA
-========================================= */
+/* ================= AUTO STATUS ================= */
+function getStatus(item){
+
+    const now = new Date();
+    const start = new Date(`${item.maintenance_date}T${item.start_time}`);
+    const end = new Date(`${item.maintenance_date}T${item.end_time}`);
+
+    if(now > end) return "done";
+    if(now >= start && now <= end) return "ongoing";
+    return "pending";
+}
+
+/* ================= LOAD DATA ================= */
 async function loadData(){
 
     try{
@@ -201,7 +234,6 @@ async function loadData(){
         );
 
         const result = await res.json();
-
         if(!result.success) throw new Error(result.message);
 
         const list = document.getElementById("maintenanceList");
@@ -213,12 +245,18 @@ async function loadData(){
 
         items.forEach(item => {
 
-            /* ================= LIST ================= */
+            const status = item.status || getStatus(item);
+
             const div = document.createElement("div");
-            div.className = "item";
+            div.className = "item " + status;
 
             div.innerHTML = `
                 <h4>⚡ ${item.company_name}</h4>
+
+                <span class="status ${status}">
+                    ${status.toUpperCase()}
+                </span>
+
                 <small>
                     📅 ${item.maintenance_date}<br>
                     🕒 ${item.start_time} - ${item.end_time}<br>
@@ -228,19 +266,12 @@ async function loadData(){
                 <button class="btn edit">Edit</button>
             `;
 
-            const btn = div.querySelector(".edit");
-
-            btn.addEventListener("click", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openEdit(item);
-            });
+            div.querySelector(".edit").onclick = () => openEdit(item);
 
             list.appendChild(div);
 
-            /* ================= MAP ================= */
+            /* MAP */
             const barangays = item.affected_barangays || [];
-
             let valid = [];
 
             barangays.forEach(name => {
@@ -251,11 +282,7 @@ async function loadData(){
                 valid.push(geo);
 
                 const marker = L.marker([geo.lat, geo.lng]).addTo(map);
-
-                marker.bindPopup(`
-                    <b>${name}</b><br>
-                    ${item.company_name}
-                `);
+                marker.bindPopup(`<b>${name}</b><br>${item.company_name}`);
 
                 layers.push(marker);
             });
@@ -289,9 +316,7 @@ async function loadData(){
     }
 }
 
-/* =========================================
-   MODAL
-========================================= */
+/* ================= OPEN MODAL ================= */
 function openEdit(item){
 
     document.getElementById("edit_id").value = item.id;
@@ -301,6 +326,9 @@ function openEdit(item){
     document.getElementById("edit_desc").value = item.description || "";
     document.getElementById("edit_radius").value = item.radius;
 
+    // optional manual override
+    document.getElementById("edit_status").value = "";
+
     document.getElementById("editModal").style.display = "flex";
 }
 
@@ -308,10 +336,17 @@ function closeModal(){
     document.getElementById("editModal").style.display = "none";
 }
 
-/* =========================================
-   UPDATE API
-========================================= */
+/* ================= UPDATE ================= */
 async function submitUpdate(){
+
+    const manualStatus = document.getElementById("edit_status").value;
+
+    let status = null;
+
+    // only send status if user selected manually
+    if(manualStatus !== ""){
+        status = manualStatus;
+    }
 
     const payload = {
         maintenance_id: document.getElementById("edit_id").value,
@@ -319,7 +354,8 @@ async function submitUpdate(){
         start_time: document.getElementById("edit_start").value,
         end_time: document.getElementById("edit_end").value,
         description: document.getElementById("edit_desc").value,
-        radius: Number(document.getElementById("edit_radius").value)
+        radius: Number(document.getElementById("edit_radius").value),
+        status: status
     };
 
     try{

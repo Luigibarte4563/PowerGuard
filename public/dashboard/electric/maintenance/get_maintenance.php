@@ -1,11 +1,7 @@
-<!-- =========================================
-     LEAFLET MAP (FIXED + CLEAN)
-========================================= -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-
 .map-card{
     background:#fff;
     padding:15px;
@@ -28,7 +24,6 @@
 .map-popup h4{
     margin:0 0 8px;
 }
-
 </style>
 
 <div class="map-card">
@@ -38,142 +33,159 @@
 
 <script>
 
+/* ================= BARANGAY DATA ================= */
+const barangayData = {
+    "Bonuan Gueset": { lat:16.0585, lng:120.3345 },
+    "Bonuan Boquig": { lat:16.0600, lng:120.3200 },
+    "Bonuan Binloc": { lat:16.0620, lng:120.3100 },
+    "Lucao": { lat:16.0435, lng:120.3310 },
+    "Tapuac": { lat:16.0460, lng:120.3450 },
+    "Tambac": { lat:16.0520, lng:120.3400 },
+    "Pantal": { lat:16.0468, lng:120.3330 },
+    "Bacayao Norte": { lat:16.0300, lng:120.3200 },
+    "Bacayao Sur": { lat:16.0250, lng:120.3250 },
+    "Malued": { lat:16.0400, lng:120.3200 },
+    "Mayombo": { lat:16.0480, lng:120.3100 },
+    "Mangin": { lat:16.0550, lng:120.3500 },
+    "Tebeng": { lat:16.0600, lng:120.3450 },
+    "Pogo Chico": { lat:16.0510, lng:120.3600 },
+    "Pogo Grande": { lat:16.0550, lng:120.3650 },
+    "Herrero": { lat:16.0450, lng:120.3350 },
+    "Poblacion Centro": { lat:16.0430, lng:120.3335 },
+    "Poblacion Oeste": { lat:16.0410, lng:120.3300 },
+    "Poblacion Este": { lat:16.0440, lng:120.3360 }
+};
+
+/* ================= MAP ================= */
 let maintenanceMap;
 let layers = [];
 
-/* =========================================
-   INIT MAP
-========================================= */
 function initMaintenanceMap(){
-
     maintenanceMap = L.map('maintenanceMap').setView(
-        [16.0430, 120.3335],
-        11
+        [16.0431, 120.3330],
+        13
     );
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© OpenStreetMap'
     }).addTo(maintenanceMap);
 }
 
-/* =========================================
-   CLEAR MAP (SAFE)
-========================================= */
 function clearMap(){
-
-    layers.forEach(layer => {
-        if (layer) maintenanceMap.removeLayer(layer);
-    });
-
+    layers.forEach(l => maintenanceMap.removeLayer(l));
     layers = [];
 }
 
-/* =========================================
-   LOAD DATA
-========================================= */
+/* ================= AUTO STATUS (FIXED) ================= */
+function computeStatus(item){
+
+    const now = new Date();
+
+    const start = new Date(`${item.maintenance_date}T${item.start_time}`);
+    const end = new Date(`${item.maintenance_date}T${item.end_time}`);
+
+    let status = item.status;
+
+    // If DB status is not reliable, override using time
+    if (!status || status === "pending" || status === "ongoing") {
+
+        if (now > end) {
+            status = "done";
+        } else if (now >= start && now <= end) {
+            status = "ongoing";
+        } else {
+            status = "pending";
+        }
+    }
+
+    return status;
+}
+
+/* ================= LOAD DATA ================= */
 async function loadMaintenanceMap(){
 
     try{
 
-        const response = await fetch(
+        const res = await fetch(
             "http://localhost/crowdsourcedapi/api/maintenance/get.php",
-            { credentials: "include" }
+            { credentials:"include" }
         );
 
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.message || "API error");
-        }
+        const result = await res.json();
+        if(!result.success) throw new Error(result.message);
 
         clearMap();
 
-        const maintenances = data.data || [];
+        const items = result.data || [];
+        const bounds = [];
 
-        maintenances.forEach(item => {
+        items.forEach(item => {
 
-            const locations = item.locations || [];
-            const radius = parseInt(item.radius || 2000);
+            const status = computeStatus(item);
 
-            let validLocations = [];
+            /* 🚨 REMOVE DONE */
+            if (status === "done") return;
 
-            locations.forEach(loc => {
+            const barangays = item.affected_barangays;
 
-                const lat = parseFloat(loc.latitude);
-                const lng = parseFloat(loc.longitude);
+            if(!Array.isArray(barangays)) return;
 
-                if (isNaN(lat) || isNaN(lng)) return;
+            const radius = Number(item.radius || 2000);
 
-                validLocations.push({ lat, lng });
+            barangays.forEach(name => {
 
-                const marker = L.marker([lat, lng]).addTo(maintenanceMap);
+                const geo = barangayData[name];
 
-                marker.bindPopup(`
+                if(!geo){
+                    console.warn("Missing barangay:", name);
+                    return;
+                }
+
+                const latlng = [geo.lat, geo.lng];
+                bounds.push(latlng);
+
+                const circle = L.circle(latlng, {
+                    radius: radius,
+                    color: status === "ongoing" ? "#3498db" : "#e74c3c",
+                    fillColor: status === "ongoing" ? "#3498db" : "#e74c3c",
+                    fillOpacity: 0.3,
+                    weight: 2
+                }).addTo(maintenanceMap);
+
+                circle.bindPopup(`
                     <div class="map-popup">
-
                         <h4>⚡ Maintenance</h4>
-
-                        <b>Barangay:</b> ${loc.barangay_name}<br>
+                        <b>Barangay:</b> ${name}<br>
                         <b>Company:</b> ${item.company_name}<br>
-                        <b>Status:</b> ${item.status}<br><br>
-
+                        <b>Status:</b> ${status}<br>
                         <b>Date:</b> ${item.maintenance_date}<br>
                         <b>Time:</b> ${item.start_time} - ${item.end_time}<br>
-
-                        <small>${item.description || ""}</small>
-
+                        <small>${item.description || "No description"}</small>
                     </div>
                 `);
 
-                layers.push(marker);
-            });
-
-            /* =========================================
-               DRAW CIRCLE ONLY IF VALID DATA EXISTS
-            ========================================= */
-            if (validLocations.length > 0) {
-
-                let centerLat = 0;
-                let centerLng = 0;
-
-                validLocations.forEach(p => {
-                    centerLat += p.lat;
-                    centerLng += p.lng;
-                });
-
-                const avgLat = centerLat / validLocations.length;
-                const avgLng = centerLng / validLocations.length;
-
-                const circle = L.circle([avgLat, avgLng], {
-
-                    radius: radius,
-                    color: '#ff3b30',
-                    weight: 2,
-                    fillColor: '#ff3b30',
-                    fillOpacity: 0.25
-
-                }).addTo(maintenanceMap);
-
                 layers.push(circle);
-            }
+            });
 
         });
 
-        // refresh rendering safety
-        maintenanceMap.invalidateSize();
+        /* FIT MAP */
+        if(bounds.length > 0){
+            maintenanceMap.fitBounds(bounds, {
+                padding: [50, 50]
+            });
+        }
 
-    } catch(err) {
-        console.error("Maintenance Map Error:", err);
+        setTimeout(() => maintenanceMap.invalidateSize(), 300);
+
+    } catch(err){
+        console.error("Map error:", err);
     }
 }
 
-/* =========================================
-   INIT
-========================================= */
+/* ================= INIT ================= */
 initMaintenanceMap();
 loadMaintenanceMap();
-
-/* AUTO REFRESH */
 setInterval(loadMaintenanceMap, 30000);
 
 </script>

@@ -3,6 +3,7 @@ session_start();
 $page = $_GET['page'] ?? 'login';
 
 require_once __DIR__ . '/../../src/config/env.php';
+
 $googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
 ?>
 
@@ -37,7 +38,7 @@ $googleClientId = $_ENV['GOOGLE_CLIENT_ID'] ?? '';
 
     <h2>Register</h2>
 
-    <form action="../api/auth/register.php" method="POST" id="registerForm">
+    <form action="../../auth/register.php" method="POST" id="registerForm">
 
         <input type="text" name="name" placeholder="Full Name" required><br><br>
         <input type="email" name="email" placeholder="Email" required><br><br>
