@@ -127,14 +127,16 @@ button {
 <script>
 
 /* =========================================
-   ELECTRIC COMPANY STATS (ONLY ACTIVE + RESOLVED)
+   ELECTRIC COMPANY STATS
 ========================================= */
 
 async function loadCompanyStats() {
 
     try {
-        const res = await fetch(
-            "http://localhost/crowdsourcedapi/api/outage_report/get_active.php",
+
+        /* ================= ACTIVE REPORTS ================= */
+        const activeRes = await fetch(
+            "http://localhost/crowdsourcedAPI/api/outage_report/get_active.php",
             {
                 method: "GET",
                 credentials: "include",
@@ -142,21 +144,42 @@ async function loadCompanyStats() {
             }
         );
 
-        const data = await res.json();
+        const activeData = await activeRes.json();
 
-        console.log("API Response:", data);
+        console.log("Active API:", activeData);
 
-        if (!data || !data.success) {
-            throw new Error("Invalid response");
+        if (!activeData.success) {
+            throw new Error("Active API failed");
         }
 
-        // ✅ FIXED: correct field name
-        setCard("active", data.total_active_reports);
+        /* ================= RESOLVED REPORTS ================= */
+        const resolvedRes = await fetch(
+            "http://localhost/crowdsourcedAPI/api/outage_report/get_resolve.php",
+            {
+                method: "GET",
+                credentials: "include",
+                headers: { "Accept": "application/json" }
+            }
+        );
 
-        // ❌ YOU DON'T HAVE THIS YET IN THIS ENDPOINT
-        setCard("resolved", 0);
+        const resolvedData = await resolvedRes.json();
+
+        console.log("Resolved API:", resolvedData);
+
+        if (!resolvedData.success) {
+            throw new Error("Resolved API failed");
+        }
+
+        /* ================= UPDATE UI ================= */
+
+        // ACTIVE
+        setCard("active", activeData.total_active_reports);
+
+        // RESOLVED
+        setCard("resolved", resolvedData.total_resolved);
 
     } catch (err) {
+
         console.error("Dashboard error:", err);
 
         setErrorState();
@@ -165,25 +188,37 @@ async function loadCompanyStats() {
 
 /* ================= UI UPDATE ================= */
 function setCard(id, value) {
+
     const el = document.getElementById(id);
+
+    if (!el) return;
+
     el.innerText = value ?? 0;
+
     el.parentElement.classList.remove("loading");
 }
 
 /* ================= ERROR STATE ================= */
 function setErrorState() {
+
     ["active", "resolved"].forEach(id => {
+
         const el = document.getElementById(id);
+
+        if (!el) return;
+
         el.innerText = "—";
+
         el.parentElement.classList.remove("loading");
     });
 }
 
 /* ================= INIT ================= */
 loadCompanyStats();
+
+/* AUTO REFRESH EVERY 10 SECONDS */
 setInterval(loadCompanyStats, 10000);
 
 </script>
-
 </body>
 </html>

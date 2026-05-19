@@ -5,17 +5,53 @@
 <title>My Reports</title>
 
 <style>
+
 body{
     font-family: Arial;
     padding:20px;
+    background:#f5f5f5;
 }
 
 .card{
-    border:1px solid #ccc;
-    padding:12px;
-    margin-bottom:10px;
-    border-radius:8px;
+    border:1px solid #ddd;
+    padding:15px;
+    margin-bottom:15px;
+    border-radius:10px;
     background:#fff;
+    box-shadow:0 2px 5px rgba(0,0,0,0.05);
+}
+
+.card h3{
+    margin:0 0 8px;
+}
+
+.badge{
+    display:inline-block;
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:12px;
+    color:#fff;
+    margin-top:5px;
+}
+
+.active{
+    background:#ff9800;
+}
+
+.under_review{
+    background:#2196f3;
+}
+
+.verified{
+    background:#4caf50;
+}
+
+.resolved{
+    background:#009688;
+}
+
+.rejected{
+    background:#f44336;
 }
 
 #formOverlay{
@@ -26,28 +62,67 @@ body{
     width:100%;
     height:100%;
     background:#000000aa;
+    z-index:999;
 }
 
 #formBox{
     background:#fff;
     width:450px;
-    margin:5% auto;
+    margin:4% auto;
     padding:20px;
     border-radius:10px;
 }
 
-input, select, textarea{
+input,
+select,
+textarea{
     width:100%;
-    padding:8px;
-    margin-top:8px;
+    padding:10px;
+    margin-top:10px;
+    border:1px solid #ccc;
+    border-radius:5px;
+    box-sizing:border-box;
+}
+
+textarea{
+    min-height:100px;
+    resize:vertical;
 }
 
 button{
     width:100%;
-    padding:10px;
-    margin-top:10px;
+    padding:12px;
+    margin-top:12px;
     cursor:pointer;
+    border:none;
+    border-radius:6px;
 }
+
+.update-btn{
+    background:#1976d2;
+    color:#fff;
+}
+
+.close-btn{
+    background:#777;
+    color:#fff;
+}
+
+.edit-btn{
+    width:auto;
+    background:#4caf50;
+    color:#fff;
+    padding:8px 15px;
+}
+
+.status-box{
+    margin-top:10px;
+    padding:10px;
+    border-radius:6px;
+    background:#f1f1f1;
+    font-size:14px;
+}
+
 </style>
 </head>
 
@@ -86,20 +161,7 @@ button{
 
 <textarea id="description" placeholder="Description"></textarea>
 
-<input type="number" id="affected_houses">
-
-<select id="status">
-    <option value="active">Active</option>
-    <option value="under_review">Under Review</option>
-    <option value="verified">Verified</option>
-    <option value="resolved">Resolved</option>
-    <option value="rejected">Rejected</option>
-</select>
-
-<select id="is_active">
-    <option value="1">Active</option>
-    <option value="0">Inactive</option>
-</select>
+<input type="number" id="affected_houses" min="1">
 
 <select id="hazard_type">
     <option value="none">None</option>
@@ -110,8 +172,24 @@ button{
     <option value="explosion_sound">Explosion Sound</option>
 </select>
 
-<button onclick="updateReport()">Update Report</button>
-<button onclick="closeForm()">Close</button>
+<!-- READ ONLY STATUS -->
+<div class="status-box">
+    <strong>Status:</strong>
+    <span id="statusText">active</span>
+</div>
+
+<div class="status-box">
+    <strong>Activity:</strong>
+    <span id="activeText">Active</span>
+</div>
+
+<button class="update-btn" onclick="updateReport()">
+    Update Report
+</button>
+
+<button class="close-btn" onclick="closeForm()">
+    Close
+</button>
 
 </div>
 </div>
@@ -124,6 +202,7 @@ let currentReport = null;
 async function loadReports(){
 
     const list = document.getElementById("list");
+
     list.innerHTML = "Loading...";
 
     try {
@@ -132,7 +211,7 @@ async function loadReports(){
             "http://localhost/crowdsourcedapi/api/outage_report/get_my_report.php",
             {
                 method: "GET",
-                credentials: "include" // JWT COOKIE
+                credentials: "include"
             }
         );
 
@@ -149,29 +228,46 @@ async function loadReports(){
         }
 
         list.innerHTML = result.data.map(r => `
+
             <div class="card">
+
                 <h3>${r.location_name}</h3>
+
                 <p>${r.description || ""}</p>
-                <small>
-                    ${r.category} | ${r.severity} | ${r.status}
-                </small>
+
+                <p>
+                    <strong>Category:</strong> ${r.category}
+                </p>
+
+                <p>
+                    <strong>Severity:</strong> ${r.severity}
+                </p>
+
+                <span class="badge ${r.status}">
+                    ${r.status}
+                </span>
+
                 <br><br>
 
-                <!-- SAFE: store JSON in data attribute -->
-                <button onclick='editReport(this)'
+                <button
+                    class="edit-btn"
+                    onclick='editReport(this)'
                     data-report='${JSON.stringify(r).replace(/'/g, "&apos;")}'
                 >
                     Edit
                 </button>
+
             </div>
+
         `).join("");
 
     } catch(err){
+
         console.error(err);
+
         list.innerHTML = "Server error";
     }
 }
-
 
 /* ================= EDIT ================= */
 function editReport(btn){
@@ -181,38 +277,67 @@ function editReport(btn){
     currentReport = r;
 
     document.getElementById("id").value = r.id;
-    document.getElementById("location_name").value = r.location_name || "";
-    document.getElementById("category").value = r.category;
-    document.getElementById("severity").value = r.severity;
-    document.getElementById("description").value = r.description || "";
-    document.getElementById("affected_houses").value = r.affected_houses || 1;
-    document.getElementById("status").value = r.status;
-    document.getElementById("is_active").value = r.is_active ? "1" : "0";
-    document.getElementById("hazard_type").value = r.hazard_type || "none";
 
-    document.getElementById("formOverlay").style.display = "block";
+    document.getElementById("location_name").value =
+        r.location_name || "";
+
+    document.getElementById("category").value =
+        r.category;
+
+    document.getElementById("severity").value =
+        r.severity;
+
+    document.getElementById("description").value =
+        r.description || "";
+
+    document.getElementById("affected_houses").value =
+        r.affected_houses || 1;
+
+    document.getElementById("hazard_type").value =
+        r.hazard_type || "none";
+
+    /* READ ONLY DISPLAY */
+    document.getElementById("statusText").innerText =
+        r.status;
+
+    document.getElementById("activeText").innerText =
+        r.is_active == 1 ? "Active" : "Inactive";
+
+    document.getElementById("formOverlay").style.display =
+        "block";
 }
-
 
 /* ================= CLOSE ================= */
 function closeForm(){
-    document.getElementById("formOverlay").style.display = "none";
+
+    document.getElementById("formOverlay").style.display =
+        "none";
 }
 
-
-/* ================= UPDATE (JWT READY) ================= */
+/* ================= UPDATE ================= */
 async function updateReport(){
 
     const payload = {
+
         id: document.getElementById("id").value,
-        location_name: document.getElementById("location_name").value,
-        category: document.getElementById("category").value,
-        severity: document.getElementById("severity").value,
-        description: document.getElementById("description").value,
-        affected_houses: document.getElementById("affected_houses").value,
-        status: document.getElementById("status").value,
-        is_active: document.getElementById("is_active").value,
-        hazard_type: document.getElementById("hazard_type").value
+
+        location_name:
+            document.getElementById("location_name").value,
+
+        category:
+            document.getElementById("category").value,
+
+        severity:
+            document.getElementById("severity").value,
+
+        description:
+            document.getElementById("description").value,
+
+        affected_houses:
+            document.getElementById("affected_houses").value,
+
+        hazard_type:
+            document.getElementById("hazard_type").value
     };
 
     try {
@@ -221,7 +346,7 @@ async function updateReport(){
             "http://localhost/crowdsourcedapi/api/outage_report/update.php",
             {
                 method: "POST",
-                credentials: "include", // JWT COOKIE SENT HERE
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },
@@ -234,12 +359,16 @@ async function updateReport(){
         alert(result.message);
 
         if(result.success){
+
             closeForm();
+
             loadReports();
         }
 
     } catch(err){
+
         console.error(err);
+
         alert("Update failed");
     }
 }
