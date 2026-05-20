@@ -2,113 +2,197 @@
 
 session_start();
 
+/* =========================
+   DEBUGGING (TEMPORARY)
+========================= */
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+/* =========================
+   REQUIRED FILES
+========================= */
 require_once __DIR__ . '/../../../src/config/connection.php';
 require_once __DIR__ . '/../../../src/config/app.php';
-require '../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../src/config/env.php';
+require_once __DIR__ . '/../../../vendor/autoload.php';
 
 use Firebase\JWT\JWT;
-require_once __DIR__ . '/../../../src/config/env.php';
 
+/* =========================
+   DATABASE CONNECTION
+========================= */
 $conn = getConnection();
-$secret_key = $_ENV['JWT_SECRET_KEY'];
 
 header('Content-Type: application/json');
 
-/* =========================
-   INPUT
-========================= */
-$name = $_POST['name'] ?? null;
-$email = $_POST['email'] ?? null;
-$picture = $_POST['picture'] ?? null;
-$google_id = $_POST['sub'] ?? null;
+try {
 
-if (!$email || !$google_id) {
-    echo json_encode([
-        "success" => false,
-        "message" => "Invalid Google data"
-    ]);
-    exit;
-}
+    /* =========================
+       SECRET KEY
+    ========================= */
+    $secret_key = $_ENV['JWT_SECRET_KEY'];
 
-/* =========================
-   FIND USER
-========================= */
-$stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-$stmt->execute([$email]);
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
+    /* =========================
+       INPUT
+    ========================= */
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $picture = trim($_POST['picture'] ?? '');
+    $google_id = trim($_POST['sub'] ?? '');
 
-/* =========================
-   CREATE USER IF NOT EXISTS
-========================= */
-if (!$user) {
+    if (empty($email) || empty($google_id)) {
+        echo json_encode([
+            "success" => false,
+            "message" => "Invalid Google data"
+        ]);
+        exit;
+    }
 
+    /* =========================
+       FIND USER
+    ========================= */
     $stmt = $conn->prepare("
-        INSERT INTO users (name, email, picture, google_id, auth_provider, account_status)
-        VALUES (?, ?, ?, ?, 'google', 'active')
+        SELECT * FROM users 
+        WHERE email = ?
+        LIMIT 1
     ");
 
-    $stmt->execute([$name, $email, $picture, $google_id]);
+    $stmt->execute([$email]);
 
-    $user_id = $conn->lastInsertId();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-} else {
-    $user_id = $user['id'];
+    /* =========================
+       CREATE USER IF NOT EXISTS
+    ========================= */
+    if (!$user) {
+
+        $stmt = $conn->prepare("
+            INSERT INTO users (
+                name,
+                email,
+                picture,
+                google_id,
+                auth_provider,
+                role
+            )
+            VALUES (
+                ?, ?, ?, ?, 'google', 'user'
+            )
+        ");
+
+        $stmt->execute([
+            $name,
+            $email,
+            $picture,
+            $google_id
+        ]);
+
+        $user_id = $conn->lastInsertId();
+
+    } else {
+
+        $user_id = $user['id'];
+
+        /* =========================
+           UPDATE GOOGLE DATA
+        ========================= */
+        $stmt = $conn->prepare("
+            UPDATE users
+            SET
+                google_id = ?,
+                picture = ?,
+                updated_at = NOW()
+            WHERE id = ?
+        ");
+
+        $stmt->execute([
+            $google_id,
+            $picture,
+            $user_id
+        ]);
+    }
+
+    /* =========================
+       RELOAD USER DATA
+    ========================= */
+    $stmt = $conn->prepare("
+        SELECT * FROM users
+        WHERE id = ?
+        LIMIT 1
+    ");
+
+    $stmt->execute([$user_id]);
+
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$user) {
+        throw new Exception("User loading failed");
+    }
+
+    /* =========================
+       UPDATE LAST LOGIN
+    ========================= */
+    $stmt = $conn->prepare("
+        UPDATE users
+        SET last_login = NOW()
+        WHERE id = ?
+    ");
+
+    $stmt->execute([$user_id]);
+
+    /* =========================
+       SESSION
+    ========================= */
+    $_SESSION['user'] = [
+        "id" => $user['id'],
+        "email" => $user['email'],
+        "role" => $user['role']
+    ];
+
+    /* =========================
+       JWT PAYLOAD
+    ========================= */
+    $payload = [
+        "id" => $user['id'],
+        "email" => $user['email'],
+        "role" => $user['role'],
+        "auth_provider" => $user['auth_provider'],
+
+        "iat" => time(),
+        "exp" => time() + 3600,
+
+        "type" => "access"
+    ];
+
+    $jwt = JWT::encode($payload, $secret_key, 'HS256');
+
+    /* =========================
+       COOKIE
+    ========================= */
+    setcookie("jwt_token", $jwt, [
+        "expires" => time() + 3600,
+        "path" => "/",
+        "httponly" => true,
+        "samesite" => "Lax",
+        "secure" => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on'
+    ]);
+
+    /* =========================
+       SUCCESS RESPONSE
+    ========================= */
+    echo json_encode([
+        "success" => true,
+        "message" => "Login successful",
+        "role" => $user['role']
+    ]);
+
+} catch (Exception $e) {
+
+    http_response_code(500);
+
+    echo json_encode([
+        "success" => false,
+        "message" => $e->getMessage()
+    ]);
 }
-
-/* =========================
-   RELOAD FULL USER DATA
-========================= */
-$stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-$stmt->execute([$user_id]);
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-/* =========================
-   UPDATE LAST LOGIN
-========================= */
-$conn->prepare("UPDATE users SET last_login = NOW() WHERE id = ?")
-     ->execute([$user_id]);
-
-/* =========================
-   SESSION (LIGHTWEIGHT ONLY)
-========================= */
-$_SESSION['user'] = [
-    "id" => $user['id'],
-    "role" => $user['role']
-];
-
-/* =========================
-   JWT PAYLOAD (STANDARDIZED)
-========================= */
-$payload = [
-    "id" => $user['id'],
-    "email" => $user['email'],
-    "role" => $user['role'],
-    "auth_provider" => "google",
-
-    "iat" => time(),
-    "exp" => time() + 3600,
-
-    // 🔥 future refresh support
-    "type" => "access"
-];
-
-$jwt = JWT::encode($payload, $secret_key, 'HS256');
-
-/* =========================
-   SECURE COOKIE
-========================= */
-setcookie("jwt_token", $jwt, [
-    "expires" => time() + 3600,
-    "path" => "/",
-    "httponly" => true,
-    "samesite" => "Lax",
-    "secure" => isset($_SERVER['HTTPS'])
-]);
-
-/* =========================
-   RESPONSE
-========================= */
-echo json_encode([
-    "success" => true,
-    "role" => $user['role']
-]);
+?>

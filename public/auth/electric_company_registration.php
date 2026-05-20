@@ -12,14 +12,14 @@ $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 ========================================= */
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $name            = trim($_POST['name'] ?? '');
-    $email           = trim($_POST['email'] ?? '');
-    $passwordRaw     = $_POST['password'] ?? '';
+    $name           = trim($_POST['name'] ?? '');
+    $email          = trim($_POST['email'] ?? '');
+    $passwordRaw    = $_POST['password'] ?? '';
 
-    $company_name    = trim($_POST['company_name'] ?? '');
-    $company_email   = trim($_POST['company_email'] ?? null);
-    $contact_number  = trim($_POST['contact_number'] ?? null);
-    $address         = trim($_POST['address'] ?? null);
+    $company_name   = trim($_POST['company_name'] ?? '');
+    $company_email  = trim($_POST['company_email'] ?? null);
+    $contact_number = trim($_POST['contact_number'] ?? null);
+    $address        = trim($_POST['address'] ?? null);
 
     /* =========================================
        VALIDATION
@@ -34,27 +34,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $checkUser = $conn->prepare("
         SELECT id FROM users WHERE email = :email LIMIT 1
     ");
+
     $checkUser->execute([":email" => $email]);
 
     if ($checkUser->fetch()) {
         die("User email already exists");
-    }
-
-    /* =========================================
-       CHECK DUPLICATE COMPANY EMAIL (if provided)
-    ========================================= */
-    if ($company_email) {
-        $checkCompany = $conn->prepare("
-            SELECT id FROM electric_companies 
-            WHERE company_email = :company_email 
-            LIMIT 1
-        ");
-
-        $checkCompany->execute([":company_email" => $company_email]);
-
-        if ($checkCompany->fetch()) {
-            die("Company email already exists");
-        }
     }
 
     /* =========================================
@@ -67,7 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $conn->beginTransaction();
 
         /* =========================================
-           CREATE USER
+           CREATE USER (ELECTRIC COMPANY USER ONLY)
         ========================================= */
         $stmt = $conn->prepare("
             INSERT INTO users (
@@ -75,17 +59,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 email,
                 password,
                 role,
-                auth_provider,
-                account_status,
-                is_verified
+                auth_provider
             ) VALUES (
                 :name,
                 :email,
                 :password,
                 'electric_company',
-                'local',
-                'active',
-                1
+                'local'
             )
         ");
 
@@ -97,48 +77,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         $user_id = $conn->lastInsertId();
 
-        /* =========================================
-           CREATE ELECTRIC COMPANY
-        ========================================== */
-        $companyStmt = $conn->prepare("
-            INSERT INTO electric_companies (
-                user_id,
-                company_name,
-                company_email,
-                contact_number,
-                address,
-                verification_status,
-                company_status
-            ) VALUES (
-                :user_id,
-                :company_name,
-                :company_email,
-                :contact_number,
-                :address,
-                'pending',
-                'active'
-            )
-        ");
-
-        $companyStmt->execute([
-            ":user_id" => $user_id,
-            ":company_name" => $company_name,
-            ":company_email" => $company_email,
-            ":contact_number" => $contact_number,
-            ":address" => $address
-        ]);
+        /*
+         * OPTIONAL:
+         * If you still want company info, you MUST store it in users table
+         * (because electric_companies table no longer exists)
+         */
 
         $conn->commit();
 
         echo "Electric company registered successfully!";
 
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
 
         $conn->rollBack();
 
         http_response_code(500);
 
-        echo "Database error: " . $e->getMessage();
+        echo "Error: " . $e->getMessage();
     }
 }
 ?>
@@ -165,7 +120,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <input type="password" name="password" placeholder="Password" required>
     <br><br>
 
-    <h3>Company Information</h3>
+    <h3>Company Information (stored later or optional)</h3>
 
     <input type="text" name="company_name" placeholder="Company Name" required>
     <br><br>

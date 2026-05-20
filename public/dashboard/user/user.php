@@ -209,6 +209,9 @@ $isGoogleUser =
         </div>
 
         <div class="notif-wrapper">
+            <button onclick="markAllAsRead()" class="mark-all-btn">
+                Mark All as Read
+            </button>
             <button onclick="toggleNotifications()">🔔 Notifications</button>
             <span id="notifCount"></span>
             <div id="notifPanel"></div>
@@ -409,17 +412,26 @@ $isGoogleUser =
             loadNotifications();
         }
 
-        async function markAsRead(id) {
-            await fetch("http://localhost/crowdsourcedapi/api/notifications/mark_as_read.php", {
+        window.markAllAsRead = async function () {
+
+            const res = await fetch("http://localhost/crowdsourcedapi/api/notification/mark_all_as_read.php", {
                 method: "POST",
                 credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id })
+                headers: {
+                    "Content-Type": "application/json"
+                }
             });
 
-            notifications = notifications.map(n => n.id === id ? { ...n, is_read: 1 } : n);
+            const data = await res.json();
+
+            if (!data.success) {
+                console.error(data.message);
+                return;
+            }
+
+            notifications = notifications.map(n => ({ ...n, is_read: 1 }));
             renderNotifications();
-        }
+        };
 
         /* LOCATION */
         async function loadLocation() {
