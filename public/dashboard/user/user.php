@@ -433,6 +433,66 @@ $isGoogleUser =
             renderNotifications();
         };
 
+        async function markAsRead(id) {
+
+            console.log("MARK AS READ:", id);
+
+            if (!id || isNaN(id)) {
+                console.error("Invalid notification ID");
+                return;
+            }
+
+            try {
+
+                const res = await fetch(
+                    "http://localhost/crowdsourcedapi/api/notification/mark_as_read.php",
+                    {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            notification_id: Number(id)
+                        })
+                    }
+                );
+
+                const text = await res.text();
+
+                console.log("RAW RESPONSE:", text);
+
+                let data;
+
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("Invalid JSON response");
+                    return;
+                }
+
+                if (!data.success) {
+                    console.error(data.message);
+                    return;
+                }
+
+                notifications = notifications.map(n => {
+
+                    if (Number(n.id) === Number(id)) {
+                        n.is_read = 1;
+                    }
+
+                    return n;
+                });
+
+                renderNotifications();
+
+            } catch (err) {
+
+                console.error("Mark Read Error:", err);
+            }
+        }
+
         /* LOCATION */
         async function loadLocation() {
             const res = await fetch("http://localhost/crowdsourcedapi/api/user_location/get.php", { credentials: "include" });
